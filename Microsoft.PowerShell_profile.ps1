@@ -155,7 +155,7 @@ function Reload-Profile {
     & $PROFILE.CurrentUserAllHosts
 }
 
-$PROFILE.CurrentUserAllHosts
+& $PROFILE.CurrentUserAllHosts
 
 function unzip ($file) {
     Write-Output("Extracting", $file, "to", $pwd)
