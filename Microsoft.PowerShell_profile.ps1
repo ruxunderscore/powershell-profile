@@ -150,9 +150,12 @@ function uptime {
     }
 }
 
-function reload-profile {
-    & $profile
+function Reload-Profile {
+    & $PROFILE
+    & $PROFILE.CurrentUserAllHosts
 }
+
+$PROFILE.CurrentUserAllHosts
 
 function unzip ($file) {
     Write-Output("Extracting", $file, "to", $pwd)
