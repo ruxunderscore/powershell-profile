@@ -1801,10 +1801,13 @@ function New-FavoriteLinks {
 
 #region Git Integration
 if ($availableDependencies['git']) {
-    function Get-GitStatus {
+    function Git-Status {
         <#
         .SYNOPSIS
         Wrapper function for 'git status'.
+        .DESCRIPTION
+        Retrieves the current status of the Git repository in the current directory.
+        This function is useful for scripts or functions that need to check the status of the repository.
         .NOTES
         Requires 'git' command to be available. Typically aliased to 'gst'.
         #>
@@ -1813,10 +1816,13 @@ if ($availableDependencies['git']) {
         git status
     }
     
-    function Get-GitBranch {
+    function Git-GetBranch {
         <#
         .SYNOPSIS
         Wrapper function for 'git branch'.
+        .DESCRIPTION
+        Returns the current Git branch name.
+        This function is useful for scripts or functions that need to know the current branch context.
         .NOTES
         Requires 'git' command to be available. Typically aliased to 'gb'.
         #>
@@ -1825,15 +1831,17 @@ if ($availableDependencies['git']) {
         git branch
     }
     
-    function Switch-GitBranch {
+    function Git-SwitchBranch {
         <#
         .SYNOPSIS
         Wrapper function for 'git checkout <branch>'.
+        .DESCRIPTION
+        Switches to a specified Git branch. If no branch name is provided, defaults to 'main'.
         .PARAMETER BranchName
         The name of the Git branch to switch to.
         .EXAMPLE
-        Switch-GitBranch main
-        Checks out the 'main' branch.
+        Switch-GitBranch dev
+        Checks out the 'dev' branch. Defaults to 'main' if no branch name is provided.
         .NOTES
         Requires 'git' command to be available. Typically aliased to 'gco'.
         #>
@@ -1843,6 +1851,133 @@ if ($availableDependencies['git']) {
             [string]$BranchName = "main"
         )
         git checkout $BranchName
+    }
+
+    function Git-Add {
+        <#
+        .SYNOPSIS
+        Wrapper function for 'git add .'.
+        .DESCRIPTION
+        Stages all changes in the current directory for the next commit.
+        This includes new files, modified files, and deleted files.
+        .NOTES
+        Requires 'git' command to be available. Typically used before committing changes.
+        #>
+        [CmdletBinding()]
+        param()
+        git add .
+    }
+
+    function Git-CommitMessage {
+        <#
+        .SYNOPSIS
+        Wrapper function for 'git commit -m <message>'.
+        .DESCRIPTION
+        Commits the staged changes with a specified commit message.
+        .PARAMETER CommitMessage
+        The commit message to use for the commit. This parameter is mandatory.
+        .EXAMPLE
+        .\Git-CommitMessage -CommitMessage "Added new feature X"
+        Commits the staged changes with the message "Added new feature X".
+        .NOTES
+        Requires 'git' command to be available. This is typically used after staging changes with Git-Add.
+        This function is designed to be used in conjunction with Git-Add.
+        #>
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory = $true, HelpMessage = "Enter the commit message.")]
+            [string]$CommitMessage
+        )
+        git commit -m "$CommitMessage"
+    }
+
+    function Git-Push {
+        <#
+        .SYNOPSIS
+        Wrapper function for 'git push'.
+        .DESCRIPTION
+        Pushes the committed changes to the remote repository.
+        .NOTES
+        Requires 'git' command to be available. This is typically used after committing changes with Git-CommitMessage.
+        #>
+        [CmdletBinding()]
+        param()
+        git push
+    }
+
+    function Git-Clone {
+        <#
+        .SYNOPSIS
+        Wrapper function for 'git clone'.
+        .DESCRIPTION
+        Clones a remote Git repository to a local directory.
+        This function simplifies the cloning process by allowing you to specify the repository URL and the destination path.
+        .PARAMETER RepoUrl
+        The URL of the remote Git repository to clone. This parameter is mandatory.
+        .PARAMETER DestinationPath
+        The local directory where the repository will be cloned. If not specified, defaults to the current directory.
+        .EXAMPLE
+        .\Git-Clone https://github.com/ruxunderscore/powershell-profile.git -DestinationPath M:\MyRepo
+        Clones the repository from the specified URL into the local directory M:\MyRepo.
+        .NOTES
+        Requires 'git' command to be available. This is typically used to create a local copy of a remote repository.
+        The function takes two parameters: RepoUrl (the URL of the remote repository) and DestinationPath (the local directory to clone into).
+        #>
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory = $true, HelpMessage = "Enter the repository URL to clone.")]
+            [string]$RepoUrl,
+
+            [Parameter(Mandatory = $false, HelpMessage = "Enter the destination path for the cloned repository. Defaults to current directory.")]
+            [string]$DestinationPath = (Get-Location).Path
+        )
+        git clone "$RepoUrl" "$DestinationPath"
+    }
+
+    function Git-Commit {
+        <#
+        .SYNOPSIS
+        Wrapper function for 'git commit -m <message>'.
+        .PARAMETER CommitMessage
+        The commit message to use for the commit. This parameter is mandatory.
+        .DESCRIPTION
+        Stages all changes in the current directory and commits them with a specified commit message.
+        .EXAMPLE
+        .\Git-Commit -CommitMessage "Updated documentation"
+        .NOTES
+        Requires 'git' command to be available. This is typically used after making changes to files in a Git repository.
+        #>
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory = $true, HelpMessage = "Enter the commit message.")]
+            [string]$CommitMessage
+        )
+        git add .
+        git commit -m "$CommitMessage"
+    }
+    function Git-LazyCommit {
+        <#
+        .SYNOPSIS
+        Wrapper function for a lazy commit process.
+        .PARAMETER CommitMessage
+        The commit message to use for the commit. This parameter is mandatory.
+        .DESCRIPTION
+        Stages all changes and commits them with a specified commit message, then pushes to the remote repository.
+        .EXAMPLE
+        .\Git-LazyCommit -CommitMessage "Finalized feature Y"
+        This will add all changes, commit them with the message "Finalized feature Y", and then push the changes to the remote repository.
+        .NOTES
+        Requires 'git' command to be available. This is a convenience function for users who want to quickly commit and push changes in one step.
+        This function combines the functionality of Git-Add, Git-CommitMessage, and Git-Push into a single operation.
+        #>
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory = $true, HelpMessage = "Enter the commit message.")]
+            [string]$CommitMessage
+        )
+        git add .
+        git commit -m "$CommitMessage"
+        git push
     }
 }
 #endregion
@@ -1856,23 +1991,20 @@ Set-Alias -Name mpdf -Value Move-PDFsToFolders
 Set-Alias -Name cbz -Value Compress-ToCBZ
 Set-Alias -Name cimg -Value Convert-ImageFormat
 
-Set-Alias -Name gst -Value Get-GitStatus
-Set-Alias -Name gb -Value Get-GitBranch
-Set-Alias -Name gco -Value Switch-GitBranch
+Set-Alias -Name gs -Value Git-Status
+Set-Alias -Name ga -Value Git-Add
+Set-Alias -Name gb -Value Git-GetBranch
+Set-Alias -Name gsw -Value Git-SwitchBranch
+Set-Alias -Name gcm -Value Git-CommitMessage
+Set-Alias -Name gco -Value Git-SwitchBranch # Alias for checkout
+Set-Alias -Name gp -Value Git-Push
+Set-Alias -Name gcl -Value Git-Clone
+Set-Alias -Name gcom -Value Git-Commit
+Set-Alias -Name lazyg -Value Git-LazyCommit
 
 #endregion
 
 #region Profile Initialization
-# Initialize Starship prompt if available
-if ($availableDependencies['starship']) {
-    try {
-        Invoke-Expression (&starship init powershell)
-        Write-LogMessage -Message "Starship prompt initialized successfully" -Level Information
-    }
-    catch {
-        Write-LogMessage -Message "Failed to initialize Starship prompt: $_" -Level Warning
-    }
-}
 
 # Set custom window title
 $Host.UI.RawUI.WindowTitle = "PowerShell $($PSVersionTable.PSVersion.ToString())"
