@@ -501,7 +501,6 @@ if ($availableDependencies['starship']) {
 }
 
 ## Final Line to set prompt
-Get-Theme
 if (Get-Command zoxide -ErrorAction SilentlyContinue) {
     Invoke-Expression (& { (zoxide init --cmd cd powershell | Out-String) })
 } else {
@@ -581,20 +580,6 @@ $($PSStyle.Foreground.Green)k9$($PSStyle.Reset) <name> - Kills a process by name
 $($PSStyle.Foreground.Green)la$($PSStyle.Reset) - Lists all files in the current directory with detailed formatting.
 
 $($PSStyle.Foreground.Green)ll$($PSStyle.Reset) - Lists all files, including hidden, in the current directory with detailed formatting.
-
-$($PSStyle.Foreground.Green)gs$($PSStyle.Reset) - Shortcut for 'git status'.
-
-$($PSStyle.Foreground.Green)ga$($PSStyle.Reset) - Shortcut for 'git add .'.
-
-$($PSStyle.Foreground.Green)gc$($PSStyle.Reset) <message> - Shortcut for 'git commit -m'.
-
-$($PSStyle.Foreground.Green)gp$($PSStyle.Reset) - Shortcut for 'git push'.
-
-$($PSStyle.Foreground.Green)g$($PSStyle.Reset) - Changes to the GitHub directory.
-
-$($PSStyle.Foreground.Green)gcom$($PSStyle.Reset) <message> - Adds all changes and commits with the specified message.
-
-$($PSStyle.Foreground.Green)lazyg$($PSStyle.Reset) <message> - Adds all changes, commits with the specified message, and pushes to the remote repository.
 
 $($PSStyle.Foreground.Green)sysinfo$($PSStyle.Reset) - Displays detailed system information.
 
