@@ -1,3 +1,4 @@
+#region Configuration
 ### PowerShell Profile Refactor
 ### Version 1.03 - Refactored
 
@@ -56,7 +57,9 @@ $ChocolateyProfile = "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
 if (Test-Path($ChocolateyProfile)) {
     Import-Module "$ChocolateyProfile"
 }
+#endregion
 
+#region Updates
 # Check for Profile Updates
 function Update-Profile {
     try {
@@ -132,7 +135,9 @@ if (-not $debug -and `
 } else {
     Write-Warning "Skipping PowerShell update in debug mode"
 }
+#endregion
 
+#region Utilities
 function Clear-Cache {
     # add clear cache logic here
     Write-Host "Clearing cache..." -ForegroundColor Cyan
@@ -191,16 +196,6 @@ function ff($name) {
 
 # Network Utilities
 function Get-PubIP { (Invoke-WebRequest http://ifconfig.me/ip).Content }
-
-# Open WinUtil full-release
-function winutil {
-	irm https://christitus.com/win | iex
-}
-
-# Open WinUtil pre-release
-function winutildev {
-	irm https://christitus.com/windev | iex
-}
 
 # System Utilities
 function admin {
@@ -269,40 +264,10 @@ function uptime {
     }
 }
 
-function reload-profile {
-    & $profile
-}
-
 function unzip ($file) {
     Write-Output("Extracting", $file, "to", $pwd)
     $fullFile = Get-ChildItem -Path $pwd -Filter $file | ForEach-Object { $_.FullName }
     Expand-Archive -Path $fullFile -DestinationPath $pwd
-}
-function hb {
-    if ($args.Length -eq 0) {
-        Write-Error "No file path specified."
-        return
-    }
-    
-    $FilePath = $args[0]
-    
-    if (Test-Path $FilePath) {
-        $Content = Get-Content $FilePath -Raw
-    } else {
-        Write-Error "File path does not exist."
-        return
-    }
-    
-    $uri = "http://bin.christitus.com/documents"
-    try {
-        $response = Invoke-RestMethod -Uri $uri -Method Post -Body $Content -ErrorAction Stop
-        $hasteKey = $response.key
-        $url = "http://bin.christitus.com/$hasteKey"
-	Set-Clipboard $url
-        Write-Output $url
-    } catch {
-        Write-Error "Failed to upload the document. Error: $_"
-    }
 }
 function grep($regex, $dir) {
     if ( $dir ) {
@@ -379,11 +344,13 @@ function trash($path) {
         Write-Host "Error: Item '$fullPath' does not exist."
     }
 }
+#endregion
 
+#region Aliases & Shortcuts
 ### Quality of Life Aliases
 
 # Navigation Shortcuts
-function docs { 
+function docs {
     $docs = if(([Environment]::GetFolderPath("MyDocuments"))) {([Environment]::GetFolderPath("MyDocuments"))} else {$HOME + "\Documents"}
     Set-Location -Path $docs
 }
@@ -413,7 +380,9 @@ function flushdns {
 function cpy { Set-Clipboard $args[0] }
 
 function pst { Get-Clipboard }
+#endregion
 
+#region PSReadLine Configuration
 # Enhanced PowerShell Experience
 # Enhanced PSReadLine Configuration
 $PSReadLineOptions = @{
@@ -488,7 +457,9 @@ $scriptblock = {
         }
 }
 Register-ArgumentCompleter -Native -CommandName dotnet -ScriptBlock $scriptblock
+#endregion
 
+#region Integrations (Starship, Zoxide)
 # Initialize Starship prompt if available
 if ($availableDependencies['starship']) {
     try {
@@ -516,7 +487,9 @@ if (Get-Command zoxide -ErrorAction SilentlyContinue) {
 
 Set-Alias -Name z -Value __zoxide_z -Option AllScope -Scope Global -Force
 Set-Alias -Name zi -Value __zoxide_zi -Option AllScope -Scope Global -Force
+#endregion
 
+#region Help & Initialization
 # Help Function
 function Show-Help {
     $helpText = @"
@@ -605,3 +578,4 @@ function Edit-Profile {
     vim $PROFILE.CurrentUserAllHosts
 }
 Set-Alias -Name ep -Value Edit-Profile
+#endregion

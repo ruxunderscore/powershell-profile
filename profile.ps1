@@ -1799,6 +1799,79 @@ function New-FavoriteLinks {
 }
 #endregion
 
+#region External Tools
+function Invoke-WinUtil {
+    <#
+    .SYNOPSIS
+    Runs the latest WinUtil full-release script from Chris Titus Tech.
+    .DESCRIPTION
+    Downloads and executes the WinUtil script using Invoke-Expression (iex).
+    .EXAMPLE
+    Invoke-WinUtil
+    .NOTES
+    Requires internet connectivity.
+    #>
+    [CmdletBinding()]
+    param()
+    irm https://christitus.com/win | iex
+}
+
+function Invoke-WinUtilDev {
+    <#
+    .SYNOPSIS
+    Runs the latest WinUtil pre-release script from Chris Titus Tech.
+    .DESCRIPTION
+    Downloads and executes the WinUtil development script using Invoke-Expression (iex).
+    .EXAMPLE
+    Invoke-WinUtilDev
+    .NOTES
+    Requires internet connectivity. Use with caution as it's a pre-release version.
+    #>
+    [CmdletBinding()]
+    param()
+    irm https://christitus.com/windev | iex
+}
+
+function Upload-Hastebin {
+    <#
+    .SYNOPSIS
+    Uploads the content of a specified file to Chris Titus Tech's hastebin instance.
+    .DESCRIPTION
+    Reads the content of the provided file and POSTs it to http://bin.christitus.com/documents.
+    Copies the resulting URL to the clipboard and outputs it to the console.
+    .PARAMETER FilePath
+    The path to the file whose content should be uploaded. Mandatory.
+    .EXAMPLE
+    Upload-Hastebin -FilePath .\my-script.ps1
+    .NOTES
+    Requires internet connectivity.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath
+    )
+
+    if (-not (Test-Path $FilePath)) {
+        Write-Error "File path does not exist: $FilePath"
+        return
+    }
+
+    $Content = Get-Content $FilePath -Raw
+    $uri = "http://bin.christitus.com/documents"
+    try {
+        $response = Invoke-RestMethod -Uri $uri -Method Post -Body $Content -ErrorAction Stop
+        $hasteKey = $response.key
+        $url = "http://bin.christitus.com/$hasteKey"
+        Set-Clipboard $url
+        Write-Output $url
+    } catch {
+        Write-Error "Failed to upload the document. Error: $_"
+    }
+}
+
+#endregion
+
 #region Git Integration
 if ($availableDependencies['git']) {
     function Git-Status {
@@ -1984,23 +2057,31 @@ if ($availableDependencies['git']) {
 
 #region Aliases
 
-Set-Alias -Name reload -Value Reload-Profile
+Set-Alias -Name reload -Value Reload-Profile -Force
 
-Set-Alias -Name rimg -Value Rename-ImageFilesSequentially
-Set-Alias -Name mpdf -Value Move-PDFsToFolders
-Set-Alias -Name cbz -Value Compress-ToCBZ
-Set-Alias -Name cimg -Value Convert-ImageFormat
+Set-Alias -Name rimg -Value Rename-ImageFilesSequentially -Force
+Set-Alias -Name mpdf -Value Move-PDFsToFolders -Force
+Set-Alias -Name cbz -Value Compress-ToCBZ -Force
+Set-Alias -Name cimg -Value Convert-ImageFormat -Force
 
-Set-Alias -Name gs -Value Git-Status
-Set-Alias -Name ga -Value Git-Add
-Set-Alias -Name gb -Value Git-GetBranch
-Set-Alias -Name gsw -Value Git-SwitchBranch
-Set-Alias -Name gcm -Value Git-CommitMessage
-Set-Alias -Name gco -Value Git-SwitchBranch # Alias for checkout
-Set-Alias -Name gp -Value Git-Push
-Set-Alias -Name gcl -Value Git-Clone
-Set-Alias -Name gcom -Value Git-Commit
-Set-Alias -Name lazyg -Value Git-LazyCommit
+# External Tool Aliases
+Set-Alias -Name winutil -Value Invoke-WinUtil -Force
+Set-Alias -Name winutildev -Value Invoke-WinUtilDev -Force
+Set-Alias -Name hb -Value Upload-Hastebin -Force
+
+# Git Aliases (only if Git is available)
+if ($availableDependencies['git']) {
+    Set-Alias -Name gs -Value Git-Status -Force
+    Set-Alias -Name ga -Value Git-Add -Force
+    Set-Alias -Name gb -Value Git-GetBranch -Force
+    Set-Alias -Name gsw -Value Git-SwitchBranch -Force
+    Set-Alias -Name gcm -Value Git-CommitMessage -Force
+    Set-Alias -Name gco -Value Git-SwitchBranch -Force # Alias for checkout
+    Set-Alias -Name gp -Value Git-Push -Force
+    Set-Alias -Name gcl -Value Git-Clone -Force
+    Set-Alias -Name gcom -Value Git-Commit -Force
+    Set-Alias -Name lazyg -Value Git-LazyCommit -Force
+}
 
 #endregion
 
@@ -2017,4 +2098,3 @@ if (-not (Test-Path -Path $CustomTempPath)) {
 
 Write-LogMessage -Message "PowerShell profile loaded successfully" -Level Information
 #endregion
-
