@@ -2,6 +2,27 @@
 Version: 1.6
 Last Updated: 2025-03-30
 Author: RuxUnderscore <https://github.com/ruxunderscore/>
+License: MIT License
+
+.SYNOPSIS
+Advanced PowerShell profile with custom functions for file/media management,
+Git integration, image processing, and system utilities.
+
+.DESCRIPTION
+This profile provides a rich set of functions and configurations aimed at
+streamlining development workflows, media organization, and general PowerShell usage.
+It includes features like:
+- Robust helper functions for logging and admin checks.
+- Advanced file/folder management: CBZ creation with metadata, PDF organization,
+  sequential image/video renaming (including Plex/Jellyfin standards),
+  permission management, numbered folder creation.
+- Image processing via ImageMagick.
+- Video metadata retrieval via ffprobe.
+- Symbolic link creation for organizing 'favorite' folders.
+- Wrappers for external tools (WinUtil, Hastebin).
+- Conditional Git integration with helper functions and aliases.
+- Extensive Comment-Based Help for functions.
+- Dependency checking for required modules and external tools.
 #>
 
 <# Changelog:
@@ -11,9 +32,11 @@ Author: RuxUnderscore <https://github.com/ruxunderscore/>
 - 2025-03-29: Refactored output/error handling for consistency (Verbose, Information, LogMessage). Added Admin checks. Corrected linter warnings (UseNullComparison, UnusedVariable).
 - 2025-03-29: Renamed `Rename-AnimeEpisodes` to `Rename-SeriesEpisodes` and `Rename-NewAnimeEpisode` to `Rename-NewSeriesEpisode` for broader use. Added Comment-Based Help examples/stubs.
 - 2025-03-29: Added generic `New-NumberedFolders` function, refactored `New-ChapterFolders` and `New-SeasonFolders` to use it. Implemented `-WhatIf` support across modifying functions. Added full Comment-Based Help. Corrected logic error in Compress-ToCBZ.
-- 2025-03-29: Centralized file extension lists into global variables ($global:Default*Extensions). Added `Invoke-Profile` helper function (renamed from Reload-Profile) and alias (`rp`). Added aliases for common custom functions (`rimg`, `mpdf`, `cbz`, `cimg`). Resolved SuppressMessageAttribute issues by renaming.
-- 2025-03-30: Parameterized metadata (Writer, Genre, AgeRating, Manga, Language) in `Compress-ToCBZ`. Corrected ComicInfo <Count> tag usage. Adjusted XML heredoc formatting for cleanliness. # <-- Added for previous step
-- 2025-03-30: Added optional `-PublicationDate` parameter to `Compress-ToCBZ` with multi-format parsing to set Year/Month/Day in ComicInfo.xml. # <-- NEW ENTRY
+- 2025-03-29: Centralized file extension lists into global variables ($global:Default*Extensions). Added `Reload-Profile` helper function (renamed from original concept) and alias (`reload`). Added aliases for common custom functions (`rimg`, `mpdf`, `cbz`, `cimg`). Resolved SuppressMessageAttribute issues by renaming.
+- 2025-03-30: Parameterized metadata (Writer, Genre, AgeRating, Manga, Language) in `Compress-ToCBZ`. Corrected ComicInfo <Count> tag usage. Adjusted XML heredoc formatting for cleanliness.
+- 2025-03-30: Added optional `-PublicationDate` parameter to `Compress-ToCBZ` with multi-format parsing to set Year/Month/Day in ComicInfo.xml.
+- 2025-03-30: Updated header format, added License and Synopsis.
+- 2025-03-30: Moved core helper functions (Write-LogMessage, Test-AdminRole) to Microsoft.Powershell_profile.ps1 (Base Profile) for earlier loading and wider availability.
 #>
 
 #region Configuration
@@ -97,60 +120,6 @@ $global:DefaultVideoFilterExtensions = @('*.mkv', '*.mp4', '*.avi', '*.mov', '*.
 #endregion
 
 #region Helper Functions
-function Write-LogMessage {
-    <#
-    .SYNOPSIS
-    Writes a formatted message to the console and a specified log file.
-    .DESCRIPTION
-    Logs a message with a timestamp and severity level to a text file.
-    Also writes the message to the appropriate PowerShell stream (Verbose, Warning, or Error)
-    based on the specified level. Automatically creates the log directory if it doesn't exist.
-    .PARAMETER Message
-    The core message text to log.
-    .PARAMETER Level
-    The severity level of the message. Valid options are 'Information', 'Warning', 'Error'. Defaults to 'Information'.
-    'Information' writes to Verbose stream, 'Warning' to Warning stream, 'Error' to Error stream.
-    .PARAMETER LogPath
-    The full path to the log file. Defaults to "$env:USERPROFILE\PowerShell\logs\profile.log".
-    .EXAMPLE
-    Write-LogMessage -Message "Operation started." -Level Information
-    Logs the message to the file and writes it to the Verbose stream.
-    .EXAMPLE
-    Write-LogMessage -Message "Configuration value missing." -Level Warning
-    Logs the message and displays a warning in the console.
-    .EXAMPLE
-    Write-LogMessage -Message "Critical process failed: $($_.Exception.Message)" -Level Error
-    Logs the message and displays an error in the console.
-    #>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Message,
-        
-        [ValidateSet('Information', 'Warning', 'Error')]
-        [string]$Level = 'Information',
-        
-        [string]$LogPath = "$env:USERPROFILE\PowerShell\logs\profile.log"
-    )
-    
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logMessage = "[$timestamp] [$Level] $Message"
-    
-    # Ensure log directory exists
-    $logDir = Split-Path -Path $LogPath -Parent
-    if (-not (Test-Path -Path $logDir)) {
-        New-Item -ItemType Directory -Path $logDir -Force | Out-Null
-    }
-    
-    Add-Content -Path $LogPath -Value $logMessage
-    
-    switch ($Level) {
-        'Warning' { Write-Warning $Message }
-        'Error' { Write-Error $Message }
-        default { Write-Verbose $Message }
-    }
-}
-
 function Reload-Profile {
     <#
     .SYNOPSIS
@@ -174,24 +143,6 @@ function Reload-Profile {
     }
     
     Write-Host "Profile(s) reloaded." -ForegroundColor Green
-}
-
-function Test-AdminRole {
-    <#
-    .SYNOPSIS
-    Checks if the current PowerShell session is running with Administrator privileges.
-    .DESCRIPTION
-    Uses the .NET WindowsPrincipal class to determine if the current user identity is
-    part of the built-in Administrators group.
-    .OUTPUTS
-    System.Boolean - Returns $true if the session is elevated (Administrator), $false otherwise.
-    .EXAMPLE
-    if (Test-AdminRole) { Write-Host "Running as Admin" }
-    #>
-    [CmdletBinding()]
-    param()
-    $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-    return $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 #endregion
 

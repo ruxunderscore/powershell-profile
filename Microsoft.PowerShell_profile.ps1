@@ -1,3 +1,34 @@
+<# PowerShell Profile (Auto-Updating Base)
+Version: 1.03
+Last Updated: 2025-03-30
+Original Author: Chris Titus Tech (Concept/Base)
+Current Maintainer: RuxUnderscore <https://github.com/ruxunderscore/>
+License: MIT License
+
+.SYNOPSIS
+Base PowerShell profile with auto-update capabilities, core utilities, and integrations.
+Installed and managed via setup.ps1 and repository updates.
+
+.DESCRIPTION
+This script serves as the primary PowerShell profile (`$PROFILE`). Key features include:
+- Automatic self-update checking against the ruxunderscore/powershell-profile repository.
+- Automatic PowerShell update checking via Winget.
+- Configuration settings (telemetry opt-out, editor preferences).
+- Integration with Terminal-Icons, Chocolatey, Starship, and Zoxide.
+- A collection of utility functions and aliases for common tasks (filesystem, network, system info).
+- PSReadLine configuration for enhanced command-line editing.
+- A mechanism (`Edit-Profile`/`ep`) for users to add customizations in a separate file,
+  preventing loss during auto-updates.
+#>
+
+<# Changelog:
+- 2024-05-01 (Assumed): Initial refactor (v1.03) from CTT concept, adding auto-updates,
+                        utilities, PSReadLine config, Starship replaces Oh-My-Posh.
+- 2024-MM-DD (Assumed): Certain utility functions migrated to profile.ps1 (User's custom profile).
+- 2025-03-30: Updated header format, added detailed synopsis, attribution, and changelog.
+- 2025-03-30: Moved Write-LogMessage and Test-AdminRole helper functions from profile.ps1 (User Script). Refactored internal logging/admin checks to use these helpers.
+#>
+
 #region Configuration
 ### PowerShell Profile Refactor
 ### Version 1.03 - Refactored
@@ -59,22 +90,114 @@ if (Test-Path($ChocolateyProfile)) {
 }
 #endregion
 
+#region Helper Functions
+# Helper functions moved from profile.ps1 (User Script) for base profile use.
+
+function Write-LogMessage {
+    <#
+    .SYNOPSIS
+    Writes a formatted message to the console and a specified log file.
+    .DESCRIPTION
+    Logs a message with a timestamp and severity level to a text file.
+    Also writes the message to the appropriate PowerShell stream (Verbose, Warning, or Error)
+    based on the specified level. Automatically creates the log directory if it doesn't exist.
+    .PARAMETER Message
+    The core message text to log.
+    .PARAMETER Level
+    The severity level of the message. Valid options are 'Information', 'Warning', 'Error'. Defaults to 'Information'.
+    'Information' writes to Verbose stream, 'Warning' to Warning stream, 'Error' to Error stream.
+    .PARAMETER LogPath
+    The full path to the log file. Defaults to "$env:USERPROFILE\PowerShell\logs\profile.log".
+    .EXAMPLE
+    Write-LogMessage -Message "Operation started." -Level Information
+    Logs the message to the file and writes it to the Verbose stream.
+    .EXAMPLE
+    Write-LogMessage -Message "Configuration value missing." -Level Warning
+    Logs the message and displays a warning in the console.
+    .EXAMPLE
+    Write-LogMessage -Message "Critical process failed: $($_.Exception.Message)" -Level Error
+    Logs the message and displays an error in the console.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message,
+
+        [ValidateSet('Information', 'Warning', 'Error')]
+        [string]$Level = 'Information',
+
+        [string]$LogPath = "$env:USERPROFILE\PowerShell\logs\profile.log"
+    )
+
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logMessage = "[$timestamp] [$Level] $Message"
+
+    # Ensure log directory exists
+    $logDir = Split-Path -Path $LogPath -Parent
+    if (-not (Test-Path -Path $logDir)) {
+        New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+    }
+
+    Add-Content -Path $LogPath -Value $logMessage
+
+    switch ($Level) {
+        'Warning' { Write-Warning $Message }
+        'Error' { Write-Error $Message } # Note: Write-Error behavior depends on $ErrorActionPreference
+        default { Write-Verbose $Message } # Information level logs go to Verbose stream
+    }
+}
+
+function Test-AdminRole {
+    <#
+    .SYNOPSIS
+    Checks if the current PowerShell session is running with Administrator privileges.
+    .DESCRIPTION
+    Uses the .NET WindowsPrincipal class to determine if the current user identity is
+    part of the built-in Administrators group.
+    .OUTPUTS
+    System.Boolean - Returns $true if the session is elevated (Administrator), $false otherwise.
+    .EXAMPLE
+    if (Test-AdminRole) { Write-Host "Running as Admin" }
+    #>
+    [CmdletBinding()]
+    param()
+    $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    return $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+#endregion
+
 #region Updates
 # Check for Profile Updates
 function Update-Profile {
     try {
         $url = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/Microsoft.PowerShell_profile.ps1"
+        # Provide direct feedback to the user THAT a check is happening
+        Write-Host "Checking for profile updates..." -ForegroundColor Cyan
+        # Log the action (visible in verbose or log file)
+        Write-LogMessage -Message "Checking for profile updates from $url" -Level Information
+
         $oldhash = Get-FileHash $PROFILE
-        Invoke-RestMethod $url -OutFile "$env:temp/Microsoft.PowerShell_profile.ps1"
+        Invoke-RestMethod $url -OutFile "$env:temp/Microsoft.PowerShell_profile.ps1" -ErrorAction Stop # Stop if download fails
         $newhash = Get-FileHash "$env:temp/Microsoft.PowerShell_profile.ps1"
+
         if ($newhash.Hash -ne $oldhash.Hash) {
             Copy-Item -Path "$env:temp/Microsoft.PowerShell_profile.ps1" -Destination $PROFILE -Force
-            Write-Host "Profile has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
+            # Provide direct feedback THAT an update occurred
+            Write-Host "Profile has been updated. Please restart PowerShell." -ForegroundColor Magenta
+            # Log the result
+            Write-LogMessage -Message "Profile has been updated. Please restart your shell to reflect changes" -Level Information
         } else {
+            # Provide direct feedback on the result
             Write-Host "Profile is up to date." -ForegroundColor Green
+            # Log the result
+            Write-LogMessage -Message "Profile is up to date." -Level Information
         }
     } catch {
-        Write-Error "Unable to check for `$profile updates: $_"
+        # Log the error
+        Write-LogMessage -Message "Unable to check for profile updates: $_" -Level Error
+        # Provide direct feedback THAT an error occurred
+        Write-Warning "Failed to check for profile updates. See log for details."
     } finally {
         Remove-Item "$env:temp/Microsoft.PowerShell_profile.ps1" -ErrorAction SilentlyContinue
     }
@@ -91,49 +214,71 @@ if (-not $debug -and `
     $currentTime | Out-File -FilePath $timeFilePath
 
 } elseif (-not $debug) {
-    Write-Warning "Profile update skipped. Last update check was within the last $updateInterval day(s)."
+    Write-LogMessage -Message "Profile update skipped. Last update check was within the last $updateInterval day(s)." -Level Warning
 } else {
-    Write-Warning "Skipping profile update check in debug mode"
+    Write-LogMessage -Message "Skipping profile update check in debug mode" -Level Warning
 }
 
 function Update-PowerShell {
     try {
+        # Provide direct feedback
         Write-Host "Checking for PowerShell updates..." -ForegroundColor Cyan
+        # Log the action
+        Write-LogMessage -Message "Checking for PowerShell updates..." -Level Information
+
         $updateNeeded = $false
         $currentVersion = $PSVersionTable.PSVersion.ToString()
         $gitHubApiUrl = "https://api.github.com/repos/PowerShell/PowerShell/releases/latest"
-        $latestReleaseInfo = Invoke-RestMethod -Uri $gitHubApiUrl
+        $latestReleaseInfo = Invoke-RestMethod -Uri $gitHubApiUrl -ErrorAction Stop
         $latestVersion = $latestReleaseInfo.tag_name.Trim('v')
+
         if ($currentVersion -lt $latestVersion) {
             $updateNeeded = $true
         }
 
         if ($updateNeeded) {
-            Write-Host "Updating PowerShell..." -ForegroundColor Yellow
+            # Provide direct feedback
+            Write-Host "Updating PowerShell to version $latestVersion..." -ForegroundColor Yellow
+            # Log the action (use Warning level as it's a significant action)
+            Write-LogMessage -Message "Updating PowerShell to version $latestVersion..." -Level Warning
+
             Start-Process powershell.exe -ArgumentList "-NoProfile -Command winget upgrade Microsoft.PowerShell --accept-source-agreements --accept-package-agreements" -Wait -NoNewWindow
-            Write-Host "PowerShell has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
+
+            # Provide direct feedback
+            Write-Host "PowerShell has been updated. Please restart PowerShell." -ForegroundColor Magenta
+            # Log the result
+            Write-LogMessage -Message "PowerShell has been updated. Please restart your shell to reflect changes" -Level Information
         } else {
-            Write-Host "Your PowerShell is up to date." -ForegroundColor Green
+            # Provide direct feedback
+            Write-Host "PowerShell ($currentVersion) is up to date." -ForegroundColor Green
+            # Log the result
+            Write-LogMessage -Message "Your PowerShell ($currentVersion) is up to date." -Level Information
         }
     } catch {
-        Write-Error "Failed to update PowerShell. Error: $_"
+        # Log the error
+        Write-LogMessage -Message "Failed to check or update PowerShell. Error: $_" -Level Error
+         # Provide direct feedback THAT an error occurred
+        Write-Warning "Failed to check or update PowerShell. See log for details."
     }
 }
 
 # skip in debug mode
 # Check if not in debug mode AND (updateInterval is -1 OR file doesn't exist OR time difference is greater than the update interval)
 if (-not $debug -and `
-    ($updateInterval -eq -1 -or `
-     -not (Test-Path $timeFilePath) -or `
-     ((Get-Date).Date - [datetime]::ParseExact((Get-Content -Path $timeFilePath), 'yyyy-MM-dd', $null).Date).TotalDays -gt $updateInterval)) {
+($updateInterval -eq -1 -or `
+ -not (Test-Path $timeFilePath) -or `
+ ((Get-Date).Date - [datetime]::ParseExact((Get-Content -Path $timeFilePath), 'yyyy-MM-dd', $null).Date).TotalDays -gt $updateInterval)) {
 
-    Update-PowerShell
-    $currentTime = Get-Date -Format 'yyyy-MM-dd'
-    $currentTime | Out-File -FilePath $timeFilePath
+Update-PowerShell
+# Update timestamp only if an update check was actually performed
+$currentTime = Get-Date -Format 'yyyy-MM-dd'
+$currentTime | Out-File -FilePath $timeFilePath
 } elseif (-not $debug) {
-    Write-Warning "PowerShell update skipped. Last update check was within the last $updateInterval day(s)."
+# Use LogMessage for Warning level
+Write-LogMessage -Message "PowerShell update check skipped. Last update check was within the last $updateInterval day(s)." -Level Warning
 } else {
-    Write-Warning "Skipping PowerShell update in debug mode"
+# Use LogMessage for Warning level (Debug Mode Notice)
+Write-LogMessage -Message "Skipping PowerShell update check in debug mode" -Level Warning
 }
 #endregion
 
@@ -162,7 +307,7 @@ function Clear-Cache {
 }
 
 # Admin Check and Prompt Customization
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$isAdmin = Test-AdminRole
 function prompt {
     if ($isAdmin) { "[" + (Get-Location) + "] # " } else { "[" + (Get-Location) + "] $ " }
 }

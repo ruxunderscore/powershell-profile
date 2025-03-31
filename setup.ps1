@@ -1,3 +1,35 @@
+<# PowerShell Environment Setup Script
+Version: 1.0
+Last Updated: 2025-03-30
+Original Author: Chris Titus Tech (Concept/Base)
+Current Maintainer: RuxUnderscore <https://github.com/ruxunderscore/>
+License: MIT License
+
+.SYNOPSIS
+Installs necessary tools (Winget/Choco packages, PS Modules), Nerd Fonts,
+and downloads/configures the base PowerShell profile script
+(`Microsoft.Powershell_profile.ps1`) from the specified GitHub repository.
+
+.DESCRIPTION
+This script prepares a Windows environment for a customized PowerShell experience.
+It performs the following steps:
+- Checks for Administrator privileges.
+- Checks for internet connectivity.
+- Installs Chocolatey package manager if not present.
+- Installs required tools via Winget (Starship, Zoxide, Eza).
+- Installs the Terminal-Icons PowerShell module.
+- Installs Nerd Fonts (Cascadia Code / CaskaydiaCove NF by default).
+- Downloads the latest `Microsoft.Powershell_profile.ps1` from the
+  ruxunderscore/powershell-profile repository, backing up any existing profile.
+- Provides guidance on where to place user customizations.
+#>
+
+<# Changelog:
+- 2025-03-30: Initialized script based on CTT concept. Added Admin/Internet checks,
+              Nerd Font install function, tool installations (Starship, Choco,
+              Icons, Zoxide, Eza), profile download/backup logic, header/comments.
+#>
+
 # Ensure the script can run with elevated privileges
 if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Warning "Please run this script as an Administrator!"
