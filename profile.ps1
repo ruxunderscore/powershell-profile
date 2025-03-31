@@ -121,12 +121,30 @@ $global:DefaultVideoFilterExtensions = @('*.mkv', '*.mp4', '*.avi', '*.mov', '*.
 
 #region Helper Functions
 # --- Load Shared Helper Functions ---
-$helperScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "HelperFunctions.ps1"
-if (Test-Path $helperScriptPath) {
-    . $helperScriptPath
-    # You might not need a log message here if the base profile already logged it
-} else {
-    Write-Warning "Helper script not found at '$helperScriptPath'. Some profile features may fail."
+$HelperScriptPath = $null # Ensure variable is reset/scoped locally if needed
+try {
+    # Construct path relative to the directory containing the currently executing profile script
+    $HelperScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "HelperFunctions.ps1"
+
+    if (Test-Path $HelperScriptPath -PathType Leaf) {
+        Write-Verbose "Dot-sourcing helper functions from '$HelperScriptPath'..."
+        . $HelperScriptPath # Execute the helper script in the current scope
+
+        # Optional: Verify loading by checking if a key function exists now
+        if (Get-Command Write-LogMessage -ErrorAction SilentlyContinue) {
+            # Use the function now that it should be loaded (logs to Verbose stream)
+            Write-LogMessage -Message "Successfully loaded helper functions from '$HelperScriptPath'." -Level Information
+        } else {
+            # This warning indicates dot-sourcing ran but functions aren't defined - problem inside HelperFunctions.ps1?
+            Write-Warning "Dot-sourcing '$HelperScriptPath' seemed to complete, but key helper functions (like Write-LogMessage) are still not defined."
+        }
+    } else {
+        Write-Warning "Helper script not found at expected location: '$HelperScriptPath'. Some profile features may fail."
+    }
+} catch {
+    Write-Error "FATAL: Failed to load critical helper script '$HelperScriptPath'. Profile loading aborted. Error: $_"
+    # Stop further profile execution if helpers are essential
+    throw "Critical helper functions failed to load."
 }
 # --- End Load ---
 #endregion

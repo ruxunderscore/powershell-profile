@@ -18,13 +18,6 @@ Changelog:
               from profile.ps1 / base profile to centralize shared logic. Added header.
 #>
 
-# Ensure script doesn't run commands if accidentally executed directly
-# It should only be dot-sourced to define functions.
-if ($MyInvocation.CommandOrigin -ne 'Runspace') {
-    Write-Warning "This script is intended to be dot-sourced by a profile script, not run directly."
-    return
-}
-
 #region Helper Functions
 
 function Write-LogMessage {
