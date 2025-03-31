@@ -23,8 +23,8 @@ This script serves as the primary PowerShell profile (`$PROFILE`). Key features 
 #>
 
 <# Changelog:
-- 2024-05-01 (Assumed): Initial refactor (v1.03) from CTT concept, adding auto-updates, utilities, PSReadLine config, Starship/Zoxide integration.
-- 2024-MM-DD (Assumed): Certain utility functions migrated to profile.ps1 (User's custom profile).
+- 2025-03-29: Initial refactor (v1.03) from CTT concept, adding auto-updates, utilities, PSReadLine config, Starship/Zoxide integration.
+- 2025-03-29: Certain utility functions migrated to profile.ps1 (User's custom profile).
 - 2025-03-30: Updated header format, added detailed synopsis, attribution, and changelog (v1.03 base).
 - 2025-03-30: Moved Write-LogMessage/Test-AdminRole helpers from user profile; refactored logging/admin checks. Renamed functions to Verb-Noun; added Comment-Based Help. Added Write-Host for startup status visibility. Created aliases for original function names; consolidated all aliases to end of script (v1.04).
 #>
