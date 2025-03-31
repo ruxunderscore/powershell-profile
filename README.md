@@ -56,10 +56,10 @@ This file is loaded _after_ the base profile, allowing you to override settings 
 **Based on your choice during setup:**
 
 - **If you chose YES** to download the advanced profile:
-    - The `ep` command will open `profile.ps1` (which was downloaded to `$PROFILE.CurrentUserAllHosts`).
+    - The `Edit-Profile` or `ep` command will open `profile.ps1` (which was downloaded to `$PROFILE.CurrentUserAllHosts`).
     - You can modify this file, remove functions you don't need, or add your own alongside the existing advanced functions.
 - **If you chose NO** to download the advanced profile:
-    - The `ep` command will open `$PROFILE.CurrentUserAllHosts`. This file might be empty or non-existent initially (the command will create it if needed when opened by editors like VS Code or Notepad).
+    - The `Edit-Profile` or `ep` command will open `$PROFILE.CurrentUserAllHosts`. This file might be empty or non-existent initially (the command will create it if needed when opened by editors like VS Code or Notepad).
     - Add all your custom aliases, functions, `$env:` settings, module imports, etc., into this file.
 
 This ensures your personal configurations are preserved across updates to the base profile.
