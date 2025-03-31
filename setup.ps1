@@ -221,7 +221,7 @@ Write-Host "`n--- Setting up Profile Scripts ---" -ForegroundColor Cyan
 # *** IMPORTANT: Verify these URLs point to the RAW content of your files on GitHub/etc. ***
 $BaseProfileUrl = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/Microsoft.PowerShell_profile.ps1"
 $AdvancedProfileUrl = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/profile.ps1"
-$HelperScriptUrl = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/HelperFunctions.ps1"
+$HelperScriptUrl = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/refs/heads/main/HelperFunctions.ps1"
 
 # --- Determine Profile Paths and Directory ---
 # $PROFILE variable automatically holds the correct path for the CurrentUserCurrentHost profile
