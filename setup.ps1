@@ -1,12 +1,12 @@
 <# PowerShell Environment Setup Script
-Version: 1.1
+Version: 1.2
 Last Updated: 2025-03-30
-Original Author: Chris Titus Tech (Concept/Base)
+Original Author: ChrisTitusTech (Concept/Base)
 Current Maintainer: RuxUnderscore <https://github.com/ruxunderscore/>
 License: MIT License
 
 .SYNOPSIS
-Installs necessary tools, fonts, and the PowerShell profile script(s).
+Installs necessary tools, fonts, helper functions, and the PowerShell profile script(s).
 
 .DESCRIPTION
 This script prepares a Windows environment for a customized PowerShell experience.
@@ -14,6 +14,7 @@ It performs the following steps:
 - Checks for Administrator privileges and internet connectivity.
 - Installs dependencies: Chocolatey, Winget packages (Starship, Zoxide, Eza),
   PowerShell Modules (Terminal-Icons), and Nerd Fonts.
+- Downloads the shared `HelperFunctions.ps1` script.
 - Downloads and configures the base PowerShell profile script
   (`Microsoft.Powershell_profile.ps1`) from the specified GitHub repository.
 - Optionally downloads and configures the user's advanced profile script (`profile.ps1`)
@@ -28,6 +29,7 @@ It performs the following steps:
 - 2025-03-30 (v1.1): Reorganized script structure logically (Checks, Dependencies, Profiles).
                       Added more comments. Implemented optional download for advanced user
                       profile (`profile.ps1`) to CurrentUserAllHosts location with backup.
+- 2025-03-30 (v1.2): Added step to download shared `HelperFunctions.ps1`. Updated header/comments.
 #>
 
 #region Initial Checks
@@ -211,16 +213,22 @@ Install-NerdFonts -FontName "CascadiaCode" -FontDisplayName "CaskaydiaCove NF" -
 
 #endregion Dependency Installation
 
+#region Profile and Helper Script Setup
 
-#region Base Profile Setup ($PROFILE)
+Write-Host "`n--- Setting up Profile Scripts ---" -ForegroundColor Cyan
 
-Write-Host "`n--- Setting up Base PowerShell Profile ($PROFILE) ---" -ForegroundColor Cyan
+# --- Define URLs ---
+# *** IMPORTANT: Verify these URLs point to the RAW content of your files on GitHub/etc. ***
 $BaseProfileUrl = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/Microsoft.PowerShell_profile.ps1"
+$AdvancedProfileUrl = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/profile.ps1"
+$HelperScriptUrl = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/HelperFunctions.ps1"
 
-# --- Determine Profile Path and Directory ---
-# $PROFILE variable automatically holds the correct path for the current host/user
+# --- Determine Profile Paths and Directory ---
+# $PROFILE variable automatically holds the correct path for the CurrentUserCurrentHost profile
 $profilePath = $PROFILE
-$profileDir = Split-Path -Path $profilePath -Parent
+$profileDir = Split-Path -Path $profilePath -Parent # Should be C:\Users\user\Documents\PowerShell
+$UserAllHostsProfilePath = $PROFILE.CurrentUserAllHosts # Often same dir, different filename
+$helperScriptPath = Join-Path -Path $profileDir -ChildPath "HelperFunctions.ps1"
 
 # --- Check/Create Profile Directory ---
 Write-Host "Ensuring profile directory exists: $profileDir"
@@ -229,7 +237,7 @@ if (!(Test-Path -Path $profileDir -PathType Container)) {
         $null = New-Item -Path $profileDir -ItemType Directory -Force -ErrorAction Stop
         Write-Host "Profile directory created." -ForegroundColor Green
     } catch {
-        Write-Error "Failed to create profile directory '$profileDir'. Cannot proceed with profile setup. Error: $_"
+        Write-Error "Failed to create profile directory '$profileDir'. Cannot proceed. Error: $_"
         Read-Host "Press Enter to exit..."
         exit 1
     }
@@ -237,117 +245,80 @@ if (!(Test-Path -Path $profileDir -PathType Container)) {
     Write-Host "Profile directory already exists."
 }
 
-# --- Backup Existing Profile ---
-if (Test-Path -Path $profilePath -PathType Leaf) {
-    $backupProfilePath = "$profilePath.old"
-    Write-Host "Existing profile found. Backing up to: $backupProfilePath" -ForegroundColor Yellow
-    try {
-        Copy-Item -Path $profilePath -Destination $backupProfilePath -Force -ErrorAction Stop
-        Write-Host "Backup successful." -ForegroundColor Green
-    } catch {
-        Write-Warning "Failed to backup existing profile at '$profilePath'. Will attempt to overwrite. Error: $_"
-    }
+# --- Download HelperFunctions.ps1 --- ### NEW SECTION ###
+Write-Host "Downloading shared helper script..."
+try {
+    Invoke-RestMethod -Uri $HelperScriptUrl -OutFile $helperScriptPath -ErrorAction Stop
+    Write-Host "Helper script ($helperScriptPath) downloaded successfully." -ForegroundColor Green
+} catch {
+    # This is critical, as profiles depend on it. Treat as error.
+    Write-Error "Failed to download or save the helper script. Profiles may not load correctly. Please check the URL '$HelperScriptUrl' and permissions. Error: $_"
+    # Optionally exit here if helpers are essential for base profile function
+    # Read-Host "Press Enter to exit..."; exit 1
 }
 
-# --- Download Base Profile ---
+# --- Base Profile Setup ($PROFILE) ---
+Write-Host "`nSetting up Base PowerShell Profile ($profilePath)..."
+# Backup Existing
+if (Test-Path -Path $profilePath -PathType Leaf) {
+    $backupProfilePath = "$profilePath.old"
+    Write-Host "Existing base profile found. Backing up to: $backupProfilePath" -ForegroundColor Yellow
+    try { Copy-Item -Path $profilePath -Destination $backupProfilePath -Force -ErrorAction Stop } catch { Write-Warning "Failed to backup existing base profile. Will attempt to overwrite. Error: $_" }
+}
+# Download Base Profile
 Write-Host "Downloading base profile from $BaseProfileUrl..."
 try {
     Invoke-RestMethod -Uri $BaseProfileUrl -OutFile $profilePath -ErrorAction Stop
-    Write-Host "Base profile ($profilePath) downloaded/updated successfully." -ForegroundColor Green
+    Write-Host "Base profile downloaded/updated successfully." -ForegroundColor Green
 } catch {
-    Write-Error "Failed to download or save the base profile. Please check the URL and permissions. Error: $_"
-    # Consider restoring backup if download fails? More complex logic.
+    Write-Error "Failed to download or save the base profile. Error: $_"
 }
-
-# --- User Guidance for Base Profile ---
-Write-Host "`nNOTE:" -ForegroundColor Yellow
-Write-Host "The base profile includes an auto-updater. Direct changes to:"
-Write-Host "$profilePath"
-Write-Host "may be overwritten. Use the 'ep' alias (after restarting PowerShell) to edit your user-specific profile."
-
-#endregion Base Profile Setup
+Write-Host "NOTE: Base profile uses auto-update. Use 'ep' alias to edit user-specific profile." -ForegroundColor Yellow
 
 
-#region Optional Advanced Profile Setup ($PROFILE.CurrentUserAllHosts)
-
-Write-Host "`n--- Optional Advanced Profile Setup ---" -ForegroundColor Cyan
-
-# --- Prompt User ---
+# --- Optional Advanced Profile Setup ($PROFILE.CurrentUserAllHosts) ---
+Write-Host "`nChecking for Advanced Profile installation..."
 $promptMessage = @"
 
-You have the option to download an advanced user profile ('profile.ps1')
-which contains many additional functions for media management, Git, etc.
-This will be installed to the 'CurrentUserAllHosts' location:
-$($PROFILE.CurrentUserAllHosts)
+Download the advanced user profile ('profile.ps1')?
+Contains many extra functions (media, Git, etc.). It will be installed to:
+$UserAllHostsProfilePath
+(Any existing file there will be backed up). Choose 'N' to skip.
 
-This is the file typically edited using the 'ep' alias from the base profile.
-If you choose yes, any existing file at that location will be backed up.
-
-Download the advanced profile? (Y/N):
+Download advanced profile? (Y/N):
 "@
 $choice = Read-Host -Prompt $promptMessage
 
-# --- Handle User Choice ---
-if ($choice -match '^[Y]') { # Match Y or Yes, case-insensitive
+if ($choice -match '^[Y]') {
     Write-Host "Proceeding with advanced profile download..."
-
-    # --- Define Paths and URL ---
-    $UserAllHostsProfilePath = $PROFILE.CurrentUserAllHosts
-    # Ensure the directory exists (usually the same as $profileDir, but check just in case)
-    $UserAllHostsProfileDir = Split-Path -Path $UserAllHostsProfilePath -Parent
-    if (!(Test-Path -Path $UserAllHostsProfileDir -PathType Container)) {
-         try {
-             $null = New-Item -Path $UserAllHostsProfileDir -ItemType Directory -Force -ErrorAction Stop
-             Write-Host "Created directory for CurrentUserAllHosts profile." -ForegroundColor Green
-         } catch {
-             Write-Error "Failed to create directory '$UserAllHostsProfileDir'. Cannot proceed with advanced profile setup. Error: $_"
-             # Skip the rest of this section
-             continue # In case this was in a loop - here it just moves past the if block
-         }
-    }
-
-    # *** IMPORTANT: Make sure this URL points to YOUR raw profile.ps1 file ***
-    $AdvancedProfileUrl = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/profile.ps1" # Assumed URL
-
-    # --- Backup Existing ---
+    # Backup Existing
     if (Test-Path -Path $UserAllHostsProfilePath -PathType Leaf) {
         $backupUserAllHostsPath = "$UserAllHostsProfilePath.old"
-        Write-Host "Existing CurrentUserAllHosts profile found. Backing up to: $backupUserAllHostsPath" -ForegroundColor Yellow
-        try {
-            Copy-Item -LiteralPath $UserAllHostsProfilePath -Destination $backupUserAllHostsPath -Force -ErrorAction Stop
-            Write-Host "Backup successful." -ForegroundColor Green
-        } catch {
-            Write-Warning "Failed to backup existing profile at '$UserAllHostsProfilePath'. Will attempt to overwrite. Error: $_"
-        }
+        Write-Host "Existing advanced profile found. Backing up to: $backupUserAllHostsPath" -ForegroundColor Yellow
+        try { Copy-Item -LiteralPath $UserAllHostsProfilePath -Destination $backupUserAllHostsPath -Force -ErrorAction Stop } catch { Write-Warning "Failed to backup existing advanced profile. Will attempt to overwrite. Error: $_" }
     }
-
-    # --- Download Advanced Profile ---
+    # Download Advanced Profile
     Write-Host "Downloading advanced profile from $AdvancedProfileUrl..."
     try {
         Invoke-RestMethod -Uri $AdvancedProfileUrl -OutFile $UserAllHostsProfilePath -ErrorAction Stop
         Write-Host "Advanced profile ($UserAllHostsProfilePath) downloaded successfully." -ForegroundColor Green
     } catch {
-        Write-Error "Failed to download or save the advanced profile. Please check the URL and permissions. Error: $_"
+        Write-Error "Failed to download or save the advanced profile. Error: $_"
     }
-
 } else {
     Write-Host "Skipping advanced profile download." -ForegroundColor Yellow
-    Write-Host "You can manually place your customizations in:"
-    Write-Host $PROFILE.CurrentUserAllHosts
+    Write-Host "Your customizations should go in: $UserAllHostsProfilePath (use 'ep' alias later)."
 }
 
-#endregion Optional Advanced Profile Setup
-
+#endregion Profile and Helper Script Setup
 
 #region Completion Message
 
 Write-Host "`n--- Setup Summary ---" -ForegroundColor Cyan
-
-# Basic check for profile file existence
-if (Test-Path -Path $PROFILE) {
-    Write-Host "- Base profile setup appears successful." -ForegroundColor Green
-} else {
-     Write-Warning "- Base profile file ($PROFILE) not found. Setup may be incomplete."
+if (Test-Path -Path $helperScriptPath) { Write-Host "- Helper script setup appears successful." -ForegroundColor Green } else { Write-Warning "- Helper script file ($helperScriptPath) not found."}
+if (Test-Path -Path $profilePath) { Write-Host "- Base profile setup appears successful." -ForegroundColor Green } else { Write-Warning "- Base profile file ($profilePath) not found."}
+if ($choice -match '^[Y]') {
+    if (Test-Path -Path $UserAllHostsProfilePath) { Write-Host "- Advanced profile setup appears successful." -ForegroundColor Green } else { Write-Warning "- Advanced profile file ($UserAllHostsProfilePath) not found despite attempting download."}
 }
 
 # Check for key tools (optional, but good feedback)

@@ -1,7 +1,7 @@
 <# PowerShell Profile (Auto-Updating Base)
 Version: 1.04
 Last Updated: 2025-03-30
-Original Author: Chris Titus Tech (Concept/Base)
+Original Author: ChrisTitusTech (Concept/Base)
 Current Maintainer: RuxUnderscore <https://github.com/ruxunderscore/>
 License: MIT License
 
@@ -93,77 +93,15 @@ if (Test-Path($ChocolateyProfile)) {
 #region Helper Functions
 # Helper functions moved from profile.ps1 (User Script) for base profile use.
 
-function Write-LogMessage {
-    <#
-    .SYNOPSIS
-    Writes a formatted message to the console and a specified log file.
-    .DESCRIPTION
-    Logs a message with a timestamp and severity level to a text file.
-    Also writes the message to the appropriate PowerShell stream (Verbose, Warning, or Error)
-    based on the specified level. Automatically creates the log directory if it doesn't exist.
-    .PARAMETER Message
-    The core message text to log.
-    .PARAMETER Level
-    The severity level of the message. Valid options are 'Information', 'Warning', 'Error'. Defaults to 'Information'.
-    'Information' writes to Verbose stream, 'Warning' to Warning stream, 'Error' to Error stream.
-    .PARAMETER LogPath
-    The full path to the log file. Defaults to "$env:USERPROFILE\PowerShell\logs\profile.log".
-    .EXAMPLE
-    Write-LogMessage -Message "Operation started." -Level Information
-    Logs the message to the file and writes it to the Verbose stream.
-    .EXAMPLE
-    Write-LogMessage -Message "Configuration value missing." -Level Warning
-    Logs the message and displays a warning in the console.
-    .EXAMPLE
-    Write-LogMessage -Message "Critical process failed: $($_.Exception.Message)" -Level Error
-    Logs the message and displays an error in the console.
-    #>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Message,
-
-        [ValidateSet('Information', 'Warning', 'Error')]
-        [string]$Level = 'Information',
-
-        [string]$LogPath = "$env:USERPROFILE\PowerShell\logs\profile.log"
-    )
-
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logMessage = "[$timestamp] [$Level] $Message"
-
-    # Ensure log directory exists
-    $logDir = Split-Path -Path $LogPath -Parent
-    if (-not (Test-Path -Path $logDir)) {
-        New-Item -ItemType Directory -Path $logDir -Force | Out-Null
-    }
-
-    Add-Content -Path $LogPath -Value $logMessage
-
-    switch ($Level) {
-        'Warning' { Write-Warning $Message }
-        'Error' { Write-Error $Message } # Note: Write-Error behavior depends on $ErrorActionPreference
-        default { Write-Verbose $Message } # Information level logs go to Verbose stream
-    }
+# --- Load Shared Helper Functions ---
+$helperScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "HelperFunctions.ps1"
+if (Test-Path $helperScriptPath) {
+    . $helperScriptPath
+    # You might not need a log message here if the base profile already logged it
+} else {
+    Write-Warning "Helper script not found at '$helperScriptPath'. Some profile features may fail."
 }
-
-function Test-AdminRole {
-    <#
-    .SYNOPSIS
-    Checks if the current PowerShell session is running with Administrator privileges.
-    .DESCRIPTION
-    Uses the .NET WindowsPrincipal class to determine if the current user identity is
-    part of the built-in Administrators group.
-    .OUTPUTS
-    System.Boolean - Returns $true if the session is elevated (Administrator), $false otherwise.
-    .EXAMPLE
-    if (Test-AdminRole) { Write-Host "Running as Admin" }
-    #>
-    [CmdletBinding()]
-    param()
-    $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-    return $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-}
+# --- End Load ---
 
 #endregion
 

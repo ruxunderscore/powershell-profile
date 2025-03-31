@@ -120,30 +120,15 @@ $global:DefaultVideoFilterExtensions = @('*.mkv', '*.mp4', '*.avi', '*.mov', '*.
 #endregion
 
 #region Helper Functions
-function Reload-Profile {
-    <#
-    .SYNOPSIS
-    Reloads the current user's PowerShell profile script.
-    .EXAMPLE
-    Reload-Profile
-    Executes the profile script again in the current session.
-    #>
-    [CmdletBinding()]
-    param()
-    Write-Verbose "Dot-sourcing profile: $PROFILE"
-    . $PROFILE
-    
-    # Also reload the CurrentUserAllHosts profile if it exists
-    if (Test-Path -LiteralPath $PROFILE.CurrentUserAllHosts) {
-        Write-Verbose "Dot-sourcing profile: $($PROFILE.CurrentUserAllHosts)"
-        . $PROFILE.CurrentUserAllHosts
-    }
-    else {
-        Write-Verbose "Profile file not found, skipping: $($PROFILE.CurrentUserAllHosts)"
-    }
-    
-    Write-Host "Profile(s) reloaded." -ForegroundColor Green
+# --- Load Shared Helper Functions ---
+$helperScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "HelperFunctions.ps1"
+if (Test-Path $helperScriptPath) {
+    . $helperScriptPath
+    # You might not need a log message here if the base profile already logged it
+} else {
+    Write-Warning "Helper script not found at '$helperScriptPath'. Some profile features may fail."
 }
+# --- End Load ---
 #endregion
 
 #region Generic Functions
