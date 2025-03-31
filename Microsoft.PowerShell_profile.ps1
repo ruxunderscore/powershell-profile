@@ -1,5 +1,5 @@
 <# PowerShell Profile (Auto-Updating Base)
-Version: 1.03
+Version: 1.04
 Last Updated: 2025-03-30
 Original Author: Chris Titus Tech (Concept/Base)
 Current Maintainer: RuxUnderscore <https://github.com/ruxunderscore/>
@@ -13,25 +13,25 @@ Installed and managed via setup.ps1 and repository updates.
 This script serves as the primary PowerShell profile (`$PROFILE`). Key features include:
 - Automatic self-update checking against the ruxunderscore/powershell-profile repository.
 - Automatic PowerShell update checking via Winget.
+- Helper functions for logging (Write-LogMessage) and Admin checks (Test-AdminRole).
 - Configuration settings (telemetry opt-out, editor preferences).
 - Integration with Terminal-Icons, Chocolatey, Starship, and Zoxide.
-- A collection of utility functions and aliases for common tasks (filesystem, network, system info).
+- A collection of utility functions (renamed to Verb-Noun) and aliases for common tasks.
 - PSReadLine configuration for enhanced command-line editing.
-- A mechanism (`Edit-Profile`/`ep`) for users to add customizations in a separate file,
-  preventing loss during auto-updates.
+- A mechanism (`Open-UserProfileScript`/`ep`) for users to add customizations in a separate file.
+- Direct console feedback (Write-Host) during startup update checks.
 #>
 
 <# Changelog:
-- 2024-05-01 (Assumed): Initial refactor (v1.03) from CTT concept, adding auto-updates,
-                        utilities, PSReadLine config, Starship replaces Oh-My-Posh.
+- 2024-05-01 (Assumed): Initial refactor (v1.03) from CTT concept, adding auto-updates, utilities, PSReadLine config, Starship/Zoxide integration.
 - 2024-MM-DD (Assumed): Certain utility functions migrated to profile.ps1 (User's custom profile).
-- 2025-03-30: Updated header format, added detailed synopsis, attribution, and changelog.
-- 2025-03-30: Moved Write-LogMessage and Test-AdminRole helper functions from profile.ps1 (User Script). Refactored internal logging/admin checks to use these helpers.
+- 2025-03-30: Updated header format, added detailed synopsis, attribution, and changelog (v1.03 base).
+- 2025-03-30: Moved Write-LogMessage/Test-AdminRole helpers from user profile; refactored logging/admin checks. Renamed functions to Verb-Noun; added Comment-Based Help. Added Write-Host for startup status visibility. Created aliases for original function names; consolidated all aliases to end of script (v1.04).
 #>
 
 #region Configuration
 ### PowerShell Profile Refactor
-### Version 1.03 - Refactored
+### Version 1.04 - Refactored & Renamed
 
 $debug = $false
 
@@ -169,7 +169,20 @@ function Test-AdminRole {
 
 #region Updates
 # Check for Profile Updates
-function Update-Profile {
+function Update-BaseProfile {
+    <#
+    .SYNOPSIS
+    Checks the remote GitHub repository for updates to this profile script and applies them if found.
+    .DESCRIPTION
+    Compares the hash of the current profile ($PROFILE) with the latest version available at
+    https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/Microsoft.PowerShell_profile.ps1.
+    If the hashes differ, downloads the new version and overwrites the current profile.
+    Provides console feedback during the check and logs results using Write-LogMessage.
+    .NOTES
+    Requires internet connectivity to github.com and raw.githubusercontent.com.
+    Suggests restarting the shell after an update.
+    Uses a temporary file during the download process.
+    #>
     try {
         $url = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/Microsoft.PowerShell_profile.ps1"
         # Provide direct feedback to the user THAT a check is happening
@@ -187,18 +200,21 @@ function Update-Profile {
             Write-Host "Profile has been updated. Please restart PowerShell." -ForegroundColor Magenta
             # Log the result
             Write-LogMessage -Message "Profile has been updated. Please restart your shell to reflect changes" -Level Information
-        } else {
+        }
+        else {
             # Provide direct feedback on the result
             Write-Host "Profile is up to date." -ForegroundColor Green
             # Log the result
             Write-LogMessage -Message "Profile is up to date." -Level Information
         }
-    } catch {
+    }
+    catch {
         # Log the error
         Write-LogMessage -Message "Unable to check for profile updates: $_" -Level Error
         # Provide direct feedback THAT an error occurred
         Write-Warning "Failed to check for profile updates. See log for details."
-    } finally {
+    }
+    finally {
         Remove-Item "$env:temp/Microsoft.PowerShell_profile.ps1" -ErrorAction SilentlyContinue
     }
 }
@@ -206,20 +222,35 @@ function Update-Profile {
 # Check if not in debug mode AND (updateInterval is -1 OR file doesn't exist OR time difference is greater than the update interval)
 if (-not $debug -and `
     ($updateInterval -eq -1 -or `
-      -not (Test-Path $timeFilePath) -or `
-      ((Get-Date) - [datetime]::ParseExact((Get-Content -Path $timeFilePath), 'yyyy-MM-dd', $null)).TotalDays -gt $updateInterval)) {
+            -not (Test-Path $timeFilePath) -or `
+        ((Get-Date) - [datetime]::ParseExact((Get-Content -Path $timeFilePath), 'yyyy-MM-dd', $null)).TotalDays -gt $updateInterval)) {
 
     Update-Profile
     $currentTime = Get-Date -Format 'yyyy-MM-dd'
     $currentTime | Out-File -FilePath $timeFilePath
 
-} elseif (-not $debug) {
+}
+elseif (-not $debug) {
     Write-LogMessage -Message "Profile update skipped. Last update check was within the last $updateInterval day(s)." -Level Warning
-} else {
+}
+else {
     Write-LogMessage -Message "Skipping profile update check in debug mode" -Level Warning
 }
 
-function Update-PowerShell {
+function Invoke-PowerShellUpdateCheck {
+    <#
+    .SYNOPSIS
+    Checks if a newer version of PowerShell Core is available on GitHub and optionally updates using Winget.
+    .DESCRIPTION
+    Compares the current PowerShell version ($PSVersionTable.PSVersion) with the latest release tag
+    found via the GitHub API (api.github.com/repos/PowerShell/PowerShell/releases/latest).
+    If an update is needed, it attempts to run 'winget upgrade Microsoft.PowerShell'.
+    Provides console feedback and logs results using Write-LogMessage.
+    .NOTES
+    Requires internet connectivity to api.github.com.
+    Requires Winget to be installed and functional for the update process.
+    Suggests restarting the shell after an update.
+    #>
     try {
         # Provide direct feedback
         Write-Host "Checking for PowerShell updates..." -ForegroundColor Cyan
@@ -248,67 +279,86 @@ function Update-PowerShell {
             Write-Host "PowerShell has been updated. Please restart PowerShell." -ForegroundColor Magenta
             # Log the result
             Write-LogMessage -Message "PowerShell has been updated. Please restart your shell to reflect changes" -Level Information
-        } else {
+        }
+        else {
             # Provide direct feedback
             Write-Host "PowerShell ($currentVersion) is up to date." -ForegroundColor Green
             # Log the result
             Write-LogMessage -Message "Your PowerShell ($currentVersion) is up to date." -Level Information
         }
-    } catch {
+    }
+    catch {
         # Log the error
         Write-LogMessage -Message "Failed to check or update PowerShell. Error: $_" -Level Error
-         # Provide direct feedback THAT an error occurred
+        # Provide direct feedback THAT an error occurred
         Write-Warning "Failed to check or update PowerShell. See log for details."
     }
 }
 
 # skip in debug mode
-# Check if not in debug mode AND (updateInterval is -1 OR file doesn't exist OR time difference is greater than the update interval)
-if (-not $debug -and `
-($updateInterval -eq -1 -or `
- -not (Test-Path $timeFilePath) -or `
- ((Get-Date).Date - [datetime]::ParseExact((Get-Content -Path $timeFilePath), 'yyyy-MM-dd', $null).Date).TotalDays -gt $updateInterval)) {
 
-Update-PowerShell
-# Update timestamp only if an update check was actually performed
-$currentTime = Get-Date -Format 'yyyy-MM-dd'
-$currentTime | Out-File -FilePath $timeFilePath
-} elseif (-not $debug) {
-# Use LogMessage for Warning level
-Write-LogMessage -Message "PowerShell update check skipped. Last update check was within the last $updateInterval day(s)." -Level Warning
-} else {
-# Use LogMessage for Warning level (Debug Mode Notice)
-Write-LogMessage -Message "Skipping PowerShell update check in debug mode" -Level Warning
+# Update check logic - uses Invoke-PowerShellUpdateCheck now
+if (-not $debug -and `
+    ($updateInterval -eq -1 -or `
+            -not (Test-Path $timeFilePath) -or `
+        ((Get-Date).Date - [datetime]::ParseExact((Get-Content -Path $timeFilePath), 'yyyy-MM-dd', $null).Date).TotalDays -gt $updateInterval)) {
+
+    Invoke-PowerShellUpdateCheck # Renamed function call
+    $currentTime = Get-Date -Format 'yyyy-MM-dd'
+    $currentTime | Out-File -FilePath $timeFilePath
+}
+elseif (-not $debug) {
+    Write-LogMessage -Message "PowerShell update check skipped. Last update check was within the last $updateInterval day(s)." -Level Warning
+}
+else {
+    Write-LogMessage -Message "Skipping PowerShell update check in debug mode" -Level Warning
 }
 #endregion
 
 #region Utilities
-function Clear-Cache {
-    # add clear cache logic here
-    Write-Host "Clearing cache..." -ForegroundColor Cyan
+function Clear-SystemCache {
+    <#
+    .SYNOPSIS
+    Clears various system and user cache locations in Windows.
+    .DESCRIPTION
+    Attempts to remove files from common cache/temporary directories, including:
+    - Windows Prefetch ($env:SystemRoot\Prefetch)
+    - Windows Temp ($env:SystemRoot\Temp)
+    - User Temp ($env:TEMP)
+    - Internet Explorer Cache ($env:LOCALAPPDATA\Microsoft\Windows\INetCache)
+    Logs progress using Write-LogMessage. Silently continues on errors (e.g., files in use).
+    .NOTES
+    May require Administrator privileges to clear some system locations effectively.
+    #>
+    Write-LogMessage -Message "Clearing system caches..." -Level Information
 
-    # Clear Windows Prefetch
-    Write-Host "Clearing Windows Prefetch..." -ForegroundColor Yellow
+    Write-LogMessage -Message "Clearing Windows Prefetch..." -Level Information
     Remove-Item -Path "$env:SystemRoot\Prefetch\*" -Force -ErrorAction SilentlyContinue
 
-    # Clear Windows Temp
-    Write-Host "Clearing Windows Temp..." -ForegroundColor Yellow
+    Write-LogMessage -Message "Clearing Windows Temp..." -Level Information
     Remove-Item -Path "$env:SystemRoot\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
 
-    # Clear User Temp
-    Write-Host "Clearing User Temp..." -ForegroundColor Yellow
+    Write-LogMessage -Message "Clearing User Temp..." -Level Information
     Remove-Item -Path "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue
 
-    # Clear Internet Explorer Cache
-    Write-Host "Clearing Internet Explorer Cache..." -ForegroundColor Yellow
+    Write-LogMessage -Message "Clearing Internet Explorer Cache..." -Level Information
     Remove-Item -Path "$env:LOCALAPPDATA\Microsoft\Windows\INetCache\*" -Recurse -Force -ErrorAction SilentlyContinue
 
-    Write-Host "Cache clearing completed." -ForegroundColor Green
+    Write-LogMessage -Message "System cache clearing attempt completed." -Level Information
 }
 
-# Admin Check and Prompt Customization
+# Admin Check and Prompt Customization (Uses Test-AdminRole added earlier)
 $isAdmin = Test-AdminRole
 function prompt {
+    <#
+    .SYNOPSIS
+    Customizes the PowerShell prompt string based on Admin status.
+    .DESCRIPTION
+    Sets the command prompt to show the current location followed by:
+    - "] # " if running as Administrator.
+    - "] $ " if running as a standard user.
+    PowerShell automatically calls the function named 'prompt'.
+    #>
     if ($isAdmin) { "[" + (Get-Location) + "] # " } else { "[" + (Get-Location) + "] $ " }
 }
 $adminSuffix = if ($isAdmin) { " [ADMIN]" } else { "" }
@@ -316,6 +366,17 @@ $Host.UI.RawUI.WindowTitle = "PowerShell {0}$adminSuffix" -f $PSVersionTable.PSV
 
 # Utility Functions
 function Test-CommandExists {
+    <#
+    .SYNOPSIS
+    Checks if a command (cmdlet, function, alias, external executable) exists in the current session.
+    .PARAMETER Command
+    The name of the command to check.
+    .EXAMPLE
+    Test-CommandExists -Command git
+    Returns $true if 'git' can be found, $false otherwise.
+    .OUTPUTS
+    System.Boolean
+    #>
     param($command)
     $exists = $null -ne (Get-Command $command -ErrorAction SilentlyContinue)
     return $exists
@@ -323,170 +384,471 @@ function Test-CommandExists {
 
 # Editor Configuration
 $EDITOR = if (Test-CommandExists nvim) { 'nvim' }
-          elseif (Test-CommandExists pvim) { 'pvim' }
-          elseif (Test-CommandExists vim) { 'vim' }
-          elseif (Test-CommandExists vi) { 'vi' }
-          elseif (Test-CommandExists code) { 'code' }
-          elseif (Test-CommandExists notepad++) { 'notepad++' }
-          elseif (Test-CommandExists sublime_text) { 'sublime_text' }
-          else { 'notepad' }
-Set-Alias -Name vim -Value $EDITOR
+elseif (Test-CommandExists pvim) { 'pvim' }
+elseif (Test-CommandExists vim) { 'vim' }
+elseif (Test-CommandExists vi) { 'vi' }
+elseif (Test-CommandExists code) { 'code' }
+elseif (Test-CommandExists notepad++) { 'notepad++' }
+elseif (Test-CommandExists sublime_text) { 'sublime_text' }
+else { 'notepad' }
 
-function touch($file) { "" | Out-File $file -Encoding ASCII }
-function ff($name) {
-    Get-ChildItem -recurse -filter "*${name}*" -ErrorAction SilentlyContinue | ForEach-Object {
-        Write-Output "$($_.FullName)"
+function New-EmptyFile {
+    <#
+    .SYNOPSIS
+    Creates a new, empty file in the current directory. Equivalent to Unix 'touch'.
+    .PARAMETER Path
+    The name (or relative path) of the file to create.
+    .EXAMPLE
+    New-EmptyFile -Path "myfile.txt"
+    Creates an empty file named 'myfile.txt'.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+    "" | Out-File -FilePath $Path -Encoding ASCII -ErrorAction Stop
+}
+
+function Find-FileRecursive {
+    <#
+    .SYNOPSIS
+    Finds files recursively matching a pattern (uses wildcards). Equivalent to 'find *name*'.
+    .PARAMETER NamePattern
+    The name pattern to search for. Wildcards (*) are supported.
+    .EXAMPLE
+    Find-FileRecursive -NamePattern "*.log"
+    Finds all files ending with '.log' in the current directory and subdirectories.
+    .OUTPUTS
+    System.String - Outputs the full path of each matching file.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$NamePattern
+    )
+    Get-ChildItem -Recurse -Filter $NamePattern -File -ErrorAction SilentlyContinue | ForEach-Object {
+        Write-Output $_.FullName
     }
 }
 
 # Network Utilities
-function Get-PubIP { (Invoke-WebRequest http://ifconfig.me/ip).Content }
+function Get-PubIP {
+    <#
+    .SYNOPSIS
+    Retrieves the public IP address of the machine using an external service.
+    .DESCRIPTION
+    Makes a web request to http://ifconfig.me/ip and returns the content, which is the public IP.
+    .EXAMPLE
+    Get-PubIP
+    .NOTES
+    Requires internet connectivity. Relies on the availability of ifconfig.me.
+    .OUTPUTS
+    System.String - The public IP address.
+    #>
+    (Invoke-WebRequest http://ifconfig.me/ip -ErrorAction Stop).Content
+}
 
 # System Utilities
-function admin {
-    if ($args.Count -gt 0) {
-        $argList = $args -join ' '
-        Start-Process wt -Verb runAs -ArgumentList "pwsh.exe -NoExit -Command $argList"
-    } else {
+function Start-ElevatedProcess {
+    <#
+    .SYNOPSIS
+    Starts a new process (default: Windows Terminal with PowerShell) with Administrator privileges.
+    Equivalent to Unix 'sudo' or 'su'.
+    .PARAMETER Command
+    [Optional] A string containing the command and arguments to execute within the new elevated PowerShell session.
+    If omitted, just opens an elevated Windows Terminal with PowerShell.
+    .EXAMPLE
+    Start-ElevatedProcess # Opens an elevated PowerShell in Windows Terminal
+    Start-ElevatedProcess -Command "Get-Service | Out-GridView" # Runs command elevated
+    .NOTES
+    Requires Windows Terminal ('wt.exe') to be installed and in the PATH.
+    Triggers a UAC prompt.
+    #>
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string]$Command
+    )
+    if ($Command) {
+        $argList = "-NoExit -Command `"$Command`"" # Ensure command string is quoted
+        Start-Process wt -Verb runAs -ArgumentList "pwsh.exe $argList"
+    }
+    else {
         Start-Process wt -Verb runAs
     }
 }
 
-# Set UNIX-like aliases for the admin command, so sudo <command> will run the command with elevated rights.
-Set-Alias -Name su -Value admin
-
-function uptime {
+function Get-SystemUptime {
+    <#
+    .SYNOPSIS
+    Displays the system's last boot time and current uptime duration.
+    .DESCRIPTION
+    Retrieves the system's last boot time using WMI (for PS 5.1) or `net statistics workstation` (for PS Core).
+    Calculates the duration since the last boot and displays both the boot time and the uptime in days, hours, minutes, seconds.
+    Logs results using Write-LogMessage.
+    .EXAMPLE
+    Get-SystemUptime
+    .NOTES
+    The method for getting boot time differs between PowerShell versions.
+    Parsing `net statistics` output depends on system locale's date/time format. Includes logic to handle common formats.
+    #>
     try {
         # check powershell version
         if ($PSVersionTable.PSVersion.Major -eq 5) {
-            $lastBoot = (Get-WmiObject win32_operatingsystem).LastBootUpTime
+            $lastBoot = (Get-WmiObject win32_operatingsystem -ErrorAction Stop).LastBootUpTime
             $bootTime = [System.Management.ManagementDateTimeConverter]::ToDateTime($lastBoot)
-        } else {
-            $lastBootStr = net statistics workstation | Select-String "since" | ForEach-Object { $_.ToString().Replace('Statistics since ', '') }
-            # check date format
-            if ($lastBootStr -match '^\d{2}/\d{2}/\d{4}') {
-                $dateFormat = 'dd/MM/yyyy'
-            } elseif ($lastBootStr -match '^\d{2}-\d{2}-\d{4}') {
-                $dateFormat = 'dd-MM-yyyy'
-            } elseif ($lastBootStr -match '^\d{4}/\d{2}/\d{2}') {
-                $dateFormat = 'yyyy/MM/dd'
-            } elseif ($lastBootStr -match '^\d{4}-\d{2}-\d{2}') {
-                $dateFormat = 'yyyy-MM-dd'
-            } elseif ($lastBootStr -match '^\d{2}\.\d{2}\.\d{4}') {
-                $dateFormat = 'dd.MM.yyyy'
-            }
-            
-            # check time format
-            if ($lastBootStr -match '\bAM\b' -or $lastBootStr -match '\bPM\b') {
-                $timeFormat = 'h:mm:ss tt'
-            } else {
-                $timeFormat = 'HH:mm:ss'
-            }
+            $lastBootStr = $bootTime.ToString("yyyy-MM-dd HH:mm:ss") # Use a consistent format for logging
+        }
+        else {
+            $lastBootStrRaw = net statistics workstation | Select-String "since" | ForEach-Object { $_.ToString().Replace('Statistics since ', '') }
+            if (-not $lastBootStrRaw) { throw "Could not retrieve 'Statistics since' string." }
 
-            $bootTime = [System.DateTime]::ParseExact($lastBootStr, "$dateFormat $timeFormat", [System.Globalization.CultureInfo]::InvariantCulture)
+            # Date format detection logic...
+            $dateFormat = $null; $timeFormat = $null # Initialize
+            if ($lastBootStrRaw -match '^\d{2}/\d{2}/\d{4}') { $dateFormat = 'MM/dd/yyyy' } # Common US
+            elseif ($lastBootStrRaw -match '^\d{2}\.\d{2}\.\d{4}') { $dateFormat = 'dd.MM.yyyy' } # Common EU
+            elseif ($lastBootStrRaw -match '^\d{4}-\d{2}-\d{2}') { $dateFormat = 'yyyy-MM-dd' } # ISO
+            # Add more date formats as needed...
+            else { throw "Unrecognized date format in '$lastBootStrRaw'." }
+
+            # Time format detection logic...
+            if ($lastBootStrRaw -match '\b(AM|PM)\b') { $timeFormat = 'h:mm:ss tt' }
+            else { $timeFormat = 'HH:mm:ss' }
+
+            $bootTime = [System.DateTime]::ParseExact($lastBootStrRaw, "$dateFormat $timeFormat", [System.Globalization.CultureInfo]::InvariantCulture) # Use InvariantCulture if format is fixed
+            $lastBootStr = $bootTime.ToString("yyyy-MM-dd HH:mm:ss") # Use a consistent format for logging
         }
 
         # Format the start time
-        ### $formattedBootTime = $bootTime.ToString("dddd, MMMM dd, yyyy HH:mm:ss", [System.Globalization.CultureInfo]::InvariantCulture)
-        $formattedBootTime = $bootTime.ToString("dddd, MMMM dd, yyyy HH:mm:ss", [System.Globalization.CultureInfo]::InvariantCulture) + " [$lastBootStr]"
-        Write-Host "System started on: $formattedBootTime" -ForegroundColor DarkGray
+        $formattedBootTime = $bootTime.ToString("dddd, MMMM dd, yyyy HH:mm:ss", [System.Globalization.CultureInfo]::CurrentCulture) # Use CurrentCulture for display
 
-        # calculate uptime
+        Write-LogMessage -Message "System started on: $formattedBootTime (Raw: $($lastBootStrRaw ?? $lastBootStr))" -Level Information
+        Write-Host "System started on: $formattedBootTime" -ForegroundColor DarkGray # Keep direct output for this
+
         $uptime = (Get-Date) - $bootTime
+        $days = $uptime.Days; $hours = $uptime.Hours; $minutes = $uptime.Minutes; $seconds = $uptime.Seconds
+        $uptimeString = "Uptime: {0} days, {1} hours, {2} minutes, {3} seconds" -f $days, $hours, $minutes, $seconds
 
-        # Uptime in days, hours, minutes, and seconds
-        $days = $uptime.Days
-        $hours = $uptime.Hours
-        $minutes = $uptime.Minutes
-        $seconds = $uptime.Seconds
+        Write-LogMessage -Message $uptimeString -Level Information
+        Write-Host $uptimeString -ForegroundColor Blue # Keep direct output for this
 
-        # Uptime output
-        Write-Host ("Uptime: {0} days, {1} hours, {2} minutes, {3} seconds" -f $days, $hours, $minutes, $seconds) -ForegroundColor Blue
-        
-
-    } catch {
-        Write-Error "An error occurred while retrieving system uptime."
+    }
+    catch {
+        Write-LogMessage -Message "An error occurred while retrieving system uptime: $_" -Level Error
     }
 }
 
-function unzip ($file) {
-    Write-Output("Extracting", $file, "to", $pwd)
-    $fullFile = Get-ChildItem -Path $pwd -Filter $file | ForEach-Object { $_.FullName }
-    Expand-Archive -Path $fullFile -DestinationPath $pwd
-}
-function grep($regex, $dir) {
-    if ( $dir ) {
-        Get-ChildItem $dir | select-string $regex
-        return
+function Expand-ZipArchiveHere {
+    <#
+    .SYNOPSIS
+    Expands a specified ZIP archive into the current directory.
+    .PARAMETER ArchiveFileName
+    The name (or relative path) of the .zip file to extract.
+    .EXAMPLE
+    Expand-ZipArchiveHere -ArchiveFileName "myarchive.zip"
+    Extracts contents of myarchive.zip into the current folder.
+    .NOTES
+    Uses the built-in Expand-Archive cmdlet. Assumes the file exists in the current PWD.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ArchiveFileName
+    )
+    $currentDir = $PWD.Path
+    Write-LogMessage -Message "Extracting '$ArchiveFileName' to '$currentDir'" -Level Information
+    $fullFile = Get-ChildItem -Path $currentDir -Filter $ArchiveFileName | Select-Object -First 1 -ExpandProperty FullName
+    if ($fullFile) {
+        Expand-Archive -Path $fullFile -DestinationPath $currentDir -Force -ErrorAction Stop
+        Write-LogMessage -Message "Successfully extracted '$ArchiveFileName'." -Level Information
     }
-    $input | select-string $regex
+    else {
+        Write-LogMessage -Message "Archive file '$ArchiveFileName' not found in '$currentDir'." -Level Error
+    }
 }
 
-function df {
-    get-volume
+function Search-FileContent {
+    <#
+    .SYNOPSIS
+    Searches for a RegEx pattern within files in a directory, or within pipeline input. Equivalent to Unix 'grep'.
+    .PARAMETER Regex
+    The regular expression pattern to search for.
+    .PARAMETER DirectoryPath
+    [Optional] The path to the directory containing files to search. If omitted, searches pipeline input.
+    .EXAMPLE
+    Search-FileContent -Regex "Error:\s+\d+" -DirectoryPath "C:\Logs" # Searches files in C:\Logs
+    Get-Content .\myfile.txt | Search-FileContent -Regex "keyword" # Searches pipeline input
+    .OUTPUTS
+    Microsoft.PowerShell.Commands.MatchInfo - Objects representing matches found by Select-String.
+    #>
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$Regex,
+
+        [Parameter(Position = 1)]
+        [string]$DirectoryPath
+    )
+    if ( $DirectoryPath ) {
+        Get-ChildItem $DirectoryPath -File -Recurse -ErrorAction SilentlyContinue | Select-String -Pattern $Regex
+    }
+    else {
+        $input | Select-String -Pattern $Regex
+    }
 }
 
-function sed($file, $find, $replace) {
-    (Get-Content $file).replace("$find", $replace) | Set-Content $file
+function Get-DiskVolumeInfo {
+    <#
+    .SYNOPSIS
+    Displays information about disk volumes. Equivalent to Unix 'df'.
+    .DESCRIPTION
+    Uses the Get-Volume cmdlet to retrieve and display details about connected disk volumes,
+    including drive letter, filesystem type, health status, and size information.
+    .EXAMPLE
+    Get-DiskVolumeInfo
+    .OUTPUTS
+    Microsoft.Storage.Management.MSFT_Volume - Objects returned by Get-Volume.
+    #>
+    Get-Volume
 }
 
-function which($name) {
-    Get-Command $name | Select-Object -ExpandProperty Definition
+function Replace-FileContent {
+    <#
+    .SYNOPSIS
+    Performs a simple string replacement within a specified file. Equivalent to basic 'sed'.
+    .PARAMETER FilePath
+    The path to the file to modify.
+    .PARAMETER FindString
+    The exact string to search for.
+    .PARAMETER ReplaceString
+    The string to replace occurrences of FindString with.
+    .EXAMPLE
+    Replace-FileContent -FilePath ".\config.txt" -FindString "old_value" -ReplaceString "new_value"
+    .NOTES
+    Reads the entire file content, performs replacement, and writes the entire content back.
+    Not suitable for very large files due to memory usage. Performs literal string replacement, not regex.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [Parameter(Mandatory = $true)]
+        [string]$FindString,
+        [Parameter(Mandatory = $true)]
+        [string]$ReplaceString
+    )
+    (Get-Content $FilePath -Raw -ErrorAction Stop).Replace($FindString, $ReplaceString) | Set-Content -Path $FilePath -ErrorAction Stop
+    Write-LogMessage -Message "Content replacement completed in '$FilePath'." -Level Information
 }
 
-function export($name, $value) {
-    set-item -force -path "env:$name" -value $value;
+function Get-CommandPath {
+    <#
+    .SYNOPSIS
+    Displays the definition or path of a command. Equivalent to Unix 'which'.
+    .PARAMETER CommandName
+    The name of the command (cmdlet, function, alias, executable) to locate.
+    .EXAMPLE
+    Get-CommandPath -CommandName git
+    Get-CommandPath -CommandName Get-ChildItem
+    .OUTPUTS
+    System.String - The path or definition of the command.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CommandName
+    )
+    Get-Command $CommandName -ErrorAction Stop | Select-Object -ExpandProperty Definition
 }
 
-function pkill($name) {
-    Get-Process $name -ErrorAction SilentlyContinue | Stop-Process
+function Set-TemporaryEnvironmentVariable {
+    <#
+   .SYNOPSIS
+   Sets an environment variable for the *current PowerShell process only*. Equivalent to Unix 'export'.
+   .PARAMETER Name
+   The name of the environment variable to set.
+   .PARAMETER Value
+   The value to assign to the environment variable.
+   .EXAMPLE
+   Set-TemporaryEnvironmentVariable -Name "MY_VAR" -Value "my_value"
+   $env:MY_VAR # Returns "my_value"
+   .NOTES
+   Changes are not persistent and only affect the current PowerShell session and its child processes.
+   #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+    Set-Item -Force -Path "env:$Name" -Value $Value
+    Write-LogMessage -Message "Set environment variable '$Name' for current process." -Level Information
 }
 
-function pgrep($name) {
-    Get-Process $name
+function Stop-ProcessByName {
+    <#
+    .SYNOPSIS
+    Stops (kills) all processes matching a specified name. Equivalent to Unix 'pkill'.
+    .PARAMETER ProcessName
+    The name of the process(es) to stop. Wildcards are not supported by default here, matches exact name.
+    .EXAMPLE
+    Stop-ProcessByName -ProcessName "notepad"
+    .NOTES
+    Uses Get-Process | Stop-Process. Errors if the process is not found are suppressed.
+    Use with caution.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProcessName
+    )
+    Get-Process $ProcessName -ErrorAction SilentlyContinue | Stop-Process -Force # Add -Force for robustness
+    Write-LogMessage -Message "Attempted to stop process(es) named '$ProcessName'." -Level Information
 }
 
-function head {
-  param($Path, $n = 10)
-  Get-Content $Path -Head $n
+function Get-ProcessByName {
+    <#
+   .SYNOPSIS
+   Lists processes matching a specified name. Equivalent to Unix 'pgrep'.
+   .PARAMETER ProcessName
+   The name of the process(es) to list.
+   .EXAMPLE
+   Get-ProcessByName -ProcessName "powershell"
+   .OUTPUTS
+   System.Diagnostics.Process - Process objects matching the name.
+   #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProcessName
+    )
+    Get-Process $ProcessName -ErrorAction SilentlyContinue # Allow Get-Process errors to show if needed
 }
 
-function tail {
-  param($Path, $n = 10, [switch]$f = $false)
-  Get-Content $Path -Tail $n -Wait:$f
+function Get-FileHead {
+    <#
+    .SYNOPSIS
+    Displays the first N lines of a file. Equivalent to Unix 'head'.
+    .PARAMETER Path
+    The path to the file.
+    .PARAMETER Lines
+    [Optional] The number of lines to display from the beginning. Defaults to 10.
+    .EXAMPLE
+    Get-FileHead -Path ".\mylog.txt" -Lines 5 # Shows first 5 lines
+    Get-FileHead -Path ".\report.csv"        # Shows first 10 lines
+    .OUTPUTS
+    System.String[] - The first N lines of the file content.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [int]$Lines = 10
+    )
+    Get-Content $Path -Head $Lines -ErrorAction Stop
+}
+
+function Get-FileTail {
+    <#
+   .SYNOPSIS
+   Displays the last N lines of a file, optionally waiting for new lines. Equivalent to Unix 'tail'.
+   .PARAMETER Path
+   The path to the file.
+   .PARAMETER Lines
+   [Optional] The number of lines to display from the end. Defaults to 10.
+   .PARAMETER Follow
+   [Optional] Switch parameter. If present (-Follow or -f), waits for new lines to be appended to the file (like 'tail -f').
+   .EXAMPLE
+   Get-FileTail -Path ".\mylog.txt" -Lines 20 # Shows last 20 lines
+   Get-FileTail -Path ".\realtimelog.log" -Follow # Shows last 10 lines and waits for more
+   .OUTPUTS
+   System.String[] - The last N lines of the file content. Waits if -Follow is specified.
+   #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [int]$Lines = 10,
+        [Alias('f')] # Add alias for the switch parameter
+        [switch]$Follow = $false
+    )
+    Get-Content $Path -Tail $Lines -Wait:$Follow -ErrorAction Stop
 }
 
 # Quick File Creation
-function nf { param($name) New-Item -ItemType "file" -Path . -Name $name }
+function New-FileHere {
+    <#
+    .SYNOPSIS
+    Quickly creates a new, empty file in the current directory.
+    .PARAMETER Name
+    The name of the file to create.
+    .EXAMPLE
+    New-FileHere -Name "notes.txt"
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+    New-Item -ItemType File -Path . -Name $Name -ErrorAction Stop | Out-Null # Suppress output object
+    Write-LogMessage -Message "Created empty file '$Name' in '$PWD'." -Level Information
+}
 
 # Directory Management
-function mkcd { param($dir) mkdir $dir -Force; Set-Location $dir }
+function New-DirectoryAndEnter {
+    <#
+   .SYNOPSIS
+   Creates a new directory (including parent directories if needed) and immediately changes into it.
+   .PARAMETER DirectoryName
+   The name or relative path of the directory to create and enter.
+   .EXAMPLE
+   New-DirectoryAndEnter -DirectoryName "MyNewProject"
+   #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DirectoryName
+    )
+    mkdir $DirectoryName -Force -ErrorAction Stop | Out-Null # mkdir is an alias for New-Item -Type Directory
+    Set-Location $DirectoryName -ErrorAction Stop
+    Write-LogMessage -Message "Created and entered directory '$DirectoryName'." -Level Information
+}
 
-function trash($path) {
-    $fullPath = (Resolve-Path -Path $path).Path
+function Move-ItemToRecycleBin {
+    <#
+    .SYNOPSIS
+    Moves a specified file or directory to the Windows Recycle Bin.
+    .PARAMETER Path
+    The path to the file or directory to move to the Recycle Bin.
+    .EXAMPLE
+    Move-ItemToRecycleBin -Path ".\oldfile.txt"
+    Move-ItemToRecycleBin -Path ".\obsolete_folder"
+    .NOTES
+    Uses the Shell.Application COM object to perform the 'delete' verb, which typically sends items to the Recycle Bin.
+    Logs success or errors using Write-LogMessage.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+    try {
+        $fullPath = (Resolve-Path -Path $Path -ErrorAction Stop).Path
 
-    if (Test-Path $fullPath) {
-        $item = Get-Item $fullPath
+        if (Test-Path $fullPath) {
+            $item = Get-Item $fullPath -ErrorAction Stop
 
-        if ($item.PSIsContainer) {
-          # Handle directory
-            $parentPath = $item.Parent.FullName
-        } else {
-            # Handle file
-            $parentPath = $item.DirectoryName
+            if ($item.PSIsContainer) { $parentPath = $item.Parent.FullName }
+            else { $parentPath = $item.DirectoryName }
+
+            # Ensure parent path is valid before using COM object
+            if (-not (Test-Path $parentPath -PathType Container)) { throw "Could not determine valid parent path for '$fullPath'." }
+
+            $shell = New-Object -ComObject 'Shell.Application'
+            $shellItem = $shell.NameSpace($parentPath).ParseName($item.Name)
+
+            if ($shellItem) {
+                $shellItem.InvokeVerb('delete')
+                Write-LogMessage -Message "Item '$fullPath' has been moved to the Recycle Bin." -Level Information
+            }
+            else {
+                Write-LogMessage -Message "Could not find the shell item '$($item.Name)' within '$parentPath' to send to Recycle Bin." -Level Error
+            }
         }
-
-        $shell = New-Object -ComObject 'Shell.Application'
-        $shellItem = $shell.NameSpace($parentPath).ParseName($item.Name)
-
-        if ($item) {
-            $shellItem.InvokeVerb('delete')
-            Write-Host "Item '$fullPath' has been moved to the Recycle Bin."
-        } else {
-            Write-Host "Error: Could not find the item '$fullPath' to trash."
+        else {
+            # This condition should ideally be caught by Resolve-Path, but double-check
+            Write-LogMessage -Message "Item '$fullPath' does not exist." -Level Error
         }
-    } else {
-        Write-Host "Error: Item '$fullPath' does not exist."
+    }
+    catch {
+        Write-LogMessage -Message "Error moving item '$Path' to Recycle Bin: $_" -Level Error
     }
 }
 #endregion
@@ -495,60 +857,157 @@ function trash($path) {
 ### Quality of Life Aliases
 
 # Navigation Shortcuts
-function docs {
-    $docs = if(([Environment]::GetFolderPath("MyDocuments"))) {([Environment]::GetFolderPath("MyDocuments"))} else {$HOME + "\Documents"}
-    Set-Location -Path $docs
-}
-    
-function dtop { 
-    $dtop = if ([Environment]::GetFolderPath("Desktop")) {[Environment]::GetFolderPath("Desktop")} else {$HOME + "\Documents"}
-    Set-Location -Path $dtop
+function Enter-DocumentsDirectory {
+    <#
+    .SYNOPSIS
+    Changes the current location to the user's Documents directory.
+    .DESCRIPTION
+    Determines the path to the user's Documents folder using Environment.GetFolderPath or a default ($HOME\Documents)
+    and then uses Set-Location to navigate there.
+    .EXAMPLE
+    Enter-DocumentsDirectory
+    #>
+    $docsPath = if ([System.Environment]::GetFolderPath("MyDocuments")) { [System.Environment]::GetFolderPath("MyDocuments") } else { Join-Path $HOME "Documents" }
+    try {
+        Set-Location -Path $docsPath -ErrorAction Stop
+        Write-LogMessage -Message "Changed location to Documents: $docsPath" -Level Information
+    }
+    catch {
+        Write-LogMessage -Message "Could not change location to Documents path '$docsPath': $_" -Level Error
+    }
 }
 
-# Simplified Process Management
-function k9 { Stop-Process -Name $args[0] }
+function Enter-DesktopDirectory {
+    <#
+   .SYNOPSIS
+   Changes the current location to the user's Desktop directory.
+   .DESCRIPTION
+   Determines the path to the user's Desktop folder using Environment.GetFolderPath or a default ($HOME\Desktop)
+   and then uses Set-Location to navigate there.
+   .EXAMPLE
+   Enter-DesktopDirectory
+   #>
+    $desktopPath = if ([System.Environment]::GetFolderPath("Desktop")) { [System.Environment]::GetFolderPath("Desktop") } else { Join-Path $HOME "Desktop" }
+    try {
+        Set-Location -Path $desktopPath -ErrorAction Stop
+        Write-LogMessage -Message "Changed location to Desktop: $desktopPath" -Level Information
+    }
+    catch {
+        Write-LogMessage -Message "Could not change location to Desktop path '$desktopPath': $_" -Level Error
+    }
+}
 
 # Enhanced Listing
-function la { Get-ChildItem -Path . -Force | Format-Table -AutoSize }
-function ll { Get-ChildItem -Path . -Force -Hidden | Format-Table -AutoSize }
+function Get-ChildItemFormatted {
+    <#
+    .SYNOPSIS
+    Lists items in the current directory using Get-ChildItem -Force | Format-Table -AutoSize. Includes hidden/system items.
+    .EXAMPLE
+    Get-ChildItemFormatted
+    .NOTES
+    Alias: la
+    #>
+    Get-ChildItem -Path . -Force | Format-Table -AutoSize
+}
+
+function Get-ChildItemFormattedHidden {
+    <#
+   .SYNOPSIS
+   Lists items in the current directory using Get-ChildItem -Force -Hidden | Format-Table -AutoSize. Explicitly includes hidden items again.
+   .EXAMPLE
+   Get-ChildItemFormattedHidden
+   .NOTES
+   Alias: ll. The original `-Hidden` switch is somewhat redundant with `-Force` but kept for clarity/original intent.
+   #>
+    Get-ChildItem -Path . -Force -Hidden | Format-Table -AutoSize
+}
 
 # Quick Access to System Information
-function sysinfo { Get-ComputerInfo }
+function Get-SystemInformation {
+    <#
+   .SYNOPSIS
+   Displays detailed system information using Get-ComputerInfo.
+   .EXAMPLE
+   Get-SystemInformation
+   .NOTES
+   Alias: sysinfo
+   .OUTPUTS
+   Microsoft.PowerShell.Commands.ComputerInfo - Object containing system details.
+   #>
+    Get-ComputerInfo
+}
 
 # Networking Utilities
-function flushdns {
-	Clear-DnsClientCache
-	Write-Host "DNS has been flushed"
+function Clear-ClientDnsCache {
+    <#
+   .SYNOPSIS
+   Clears the local DNS resolver cache using Clear-DnsClientCache.
+   .EXAMPLE
+   Clear-ClientDnsCache
+   .NOTES
+   Requires Administrator privileges. Alias: flushdns
+   #>
+    Clear-DnsClientCache -ErrorAction Stop # Requires Admin
+    Write-LogMessage -Message "DNS client cache has been flushed." -Level Information
 }
 
 # Clipboard Utilities
-function cpy { Set-Clipboard $args[0] }
+function Set-ClipboardText {
+    <#
+    .SYNOPSIS
+    Copies the provided text to the clipboard.
+    .PARAMETER Text
+    The string value to copy to the clipboard.
+    .EXAMPLE
+    Set-ClipboardText -Text "Hello World"
+    "Some Text" | Set-ClipboardText # Also accepts pipeline input
+    .NOTES
+    Alias: cpy
+    #>
+    param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [string]$Text
+    )
+    Set-Clipboard -Value $Text
+}
 
-function pst { Get-Clipboard }
+function Get-ClipboardText {
+    <#
+   .SYNOPSIS
+   Retrieves text content from the clipboard.
+   .EXAMPLE
+   Get-ClipboardText
+   .NOTES
+   Alias: pst
+   .OUTPUTS
+   System.String - The text content of the clipboard.
+   #>
+    Get-Clipboard
+}
 #endregion
 
 #region PSReadLine Configuration
 # Enhanced PowerShell Experience
 # Enhanced PSReadLine Configuration
 $PSReadLineOptions = @{
-    EditMode = 'Windows'
-    HistoryNoDuplicates = $true
+    EditMode                      = 'Windows'
+    HistoryNoDuplicates           = $true
     HistorySearchCursorMovesToEnd = $true
-    Colors = @{
-        Command = '#87CEEB'  # SkyBlue (pastel)
+    Colors                        = @{
+        Command   = '#87CEEB'  # SkyBlue (pastel)
         Parameter = '#98FB98'  # PaleGreen (pastel)
-        Operator = '#FFB6C1'  # LightPink (pastel)
-        Variable = '#DDA0DD'  # Plum (pastel)
-        String = '#FFDAB9'  # PeachPuff (pastel)
-        Number = '#B0E0E6'  # PowderBlue (pastel)
-        Type = '#F0E68C'  # Khaki (pastel)
-        Comment = '#D3D3D3'  # LightGray (pastel)
-        Keyword = '#8367c7'  # Violet (pastel)
-        Error = '#FF6347'  # Tomato (keeping it close to red for visibility)
+        Operator  = '#FFB6C1'  # LightPink (pastel)
+        Variable  = '#DDA0DD'  # Plum (pastel)
+        String    = '#FFDAB9'  # PeachPuff (pastel)
+        Number    = '#B0E0E6'  # PowderBlue (pastel)
+        Type      = '#F0E68C'  # Khaki (pastel)
+        Comment   = '#D3D3D3'  # LightGray (pastel)
+        Keyword   = '#8367c7'  # Violet (pastel)
+        Error     = '#FF6347'  # Tomato (keeping it close to red for visibility)
     }
-    PredictionSource = 'History'
-    PredictionViewStyle = 'ListView'
-    BellStyle = 'None'
+    PredictionSource              = 'History'
+    PredictionViewStyle           = 'ListView'
+    BellStyle                     = 'None'
 }
 Set-PSReadLineOption @PSReadLineOptions
 
@@ -580,8 +1039,8 @@ Set-PSReadLineOption -MaximumHistoryCount 10000
 $scriptblock = {
     param($wordToComplete, $commandAst, $cursorPosition)
     $customCompletions = @{
-        'git' = @('status', 'add', 'commit', 'push', 'pull', 'clone', 'checkout')
-        'npm' = @('install', 'start', 'run', 'test', 'build')
+        'git'  = @('status', 'add', 'commit', 'push', 'pull', 'clone', 'checkout')
+        'npm'  = @('install', 'start', 'run', 'test', 'build')
         'deno' = @('run', 'compile', 'bundle', 'test', 'lint', 'fmt', 'cache', 'info', 'doc', 'upgrade')
     }
     
@@ -597,130 +1056,143 @@ Register-ArgumentCompleter -Native -CommandName git, npm, deno -ScriptBlock $scr
 $scriptblock = {
     param($wordToComplete, $commandAst, $cursorPosition)
     dotnet complete --position $cursorPosition $commandAst.ToString() |
-        ForEach-Object {
-            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
-        }
+    ForEach-Object {
+        [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+    }
 }
 Register-ArgumentCompleter -Native -CommandName dotnet -ScriptBlock $scriptblock
 #endregion
 
 #region Integrations (Starship, Zoxide)
 # Initialize Starship prompt if available
-if ($availableDependencies['starship']) {
+# Assuming $availableDependencies is populated elsewhere or Test-CommandExists is used
+if (Test-CommandExists starship) {
+    # Simplified check example
     try {
         Invoke-Expression (&starship init powershell)
+        # Uses LogMessage - already consistent
         Write-LogMessage -Message "Starship prompt initialized successfully" -Level Information
     }
     catch {
+        # Uses LogMessage - already consistent
         Write-LogMessage -Message "Failed to initialize Starship prompt: $_" -Level Warning
     }
 }
+else {
+    Write-LogMessage -Message "Starship command not found. Skipping initialization." -Level Warning
+}
+
 
 ## Final Line to set prompt
 if (Get-Command zoxide -ErrorAction SilentlyContinue) {
+    Write-LogMessage -Message "Zoxide found. Initializing..." -Level Information
     Invoke-Expression (& { (zoxide init --cmd cd powershell | Out-String) })
-} else {
-    Write-Host "zoxide command not found. Attempting to install via winget..."
+}
+else {
+    # Use LogMessage for Warning level
+    Write-LogMessage -Message "zoxide command not found. Attempting to install via winget..." -Level Warning
     try {
         winget install -e --id ajeetdsouza.zoxide
-        Write-Host "zoxide installed successfully. Initializing..."
+        # Use LogMessage for Information level
+        Write-LogMessage -Message "zoxide installed successfully via winget. Initializing..." -Level Information
+        # Need to re-run init after install
         Invoke-Expression (& { (zoxide init powershell | Out-String) })
-    } catch {
-        Write-Error "Failed to install zoxide. Error: $_"
+    }
+    catch {
+        # Use LogMessage for Error level
+        Write-LogMessage -Message "Failed to install zoxide via winget. Error: $_" -Level Error
     }
 }
-
-Set-Alias -Name z -Value __zoxide_z -Option AllScope -Scope Global -Force
-Set-Alias -Name zi -Value __zoxide_zi -Option AllScope -Scope Global -Force
 #endregion
 
 #region Help & Initialization
-# Help Function
-function Show-Help {
-    $helpText = @"
-$($PSStyle.Foreground.Cyan)PowerShell Profile Help$($PSStyle.Reset)
-$($PSStyle.Foreground.Yellow)=======================$($PSStyle.Reset)
 
-$($PSStyle.Foreground.Green)Update-Profile$($PSStyle.Reset) - Checks for profile updates from a remote repository and updates if necessary.
-
-$($PSStyle.Foreground.Green)Update-PowerShell$($PSStyle.Reset) - Checks for the latest PowerShell release and updates if a new version is available.
-
-$($PSStyle.Foreground.Green)Edit-Profile$($PSStyle.Reset) - Opens the current user's profile for editing using the configured editor.
-
-$($PSStyle.Foreground.Green)touch$($PSStyle.Reset) <file> - Creates a new empty file.
-
-$($PSStyle.Foreground.Green)ff$($PSStyle.Reset) <name> - Finds files recursively with the specified name.
-
-$($PSStyle.Foreground.Green)Get-PubIP$($PSStyle.Reset) - Retrieves the public IP address of the machine.
-
-$($PSStyle.Foreground.Green)winutil$($PSStyle.Reset) - Runs the latest WinUtil full-release script from Chris Titus Tech.
-
-$($PSStyle.Foreground.Green)winutildev$($PSStyle.Reset) - Runs the latest WinUtil pre-release script from Chris Titus Tech.
-
-$($PSStyle.Foreground.Green)uptime$($PSStyle.Reset) - Displays the system uptime.
-
-$($PSStyle.Foreground.Green)reload-profile$($PSStyle.Reset) - Reloads the current user's PowerShell profile.
-
-$($PSStyle.Foreground.Green)unzip$($PSStyle.Reset) <file> - Extracts a zip file to the current directory.
-
-$($PSStyle.Foreground.Green)hb$($PSStyle.Reset) <file> - Uploads the specified file's content to a hastebin-like service and returns the URL.
-
-$($PSStyle.Foreground.Green)grep$($PSStyle.Reset) <regex> [dir] - Searches for a regex pattern in files within the specified directory or from the pipeline input.
-
-$($PSStyle.Foreground.Green)df$($PSStyle.Reset) - Displays information about volumes.
-
-$($PSStyle.Foreground.Green)sed$($PSStyle.Reset) <file> <find> <replace> - Replaces text in a file.
-
-$($PSStyle.Foreground.Green)which$($PSStyle.Reset) <name> - Shows the path of the command.
-
-$($PSStyle.Foreground.Green)export$($PSStyle.Reset) <name> <value> - Sets an environment variable.
-
-$($PSStyle.Foreground.Green)pkill$($PSStyle.Reset) <name> - Kills processes by name.
-
-$($PSStyle.Foreground.Green)pgrep$($PSStyle.Reset) <name> - Lists processes by name.
-
-$($PSStyle.Foreground.Green)head$($PSStyle.Reset) <path> [n] - Displays the first n lines of a file (default 10).
-
-$($PSStyle.Foreground.Green)tail$($PSStyle.Reset) <path> [n] - Displays the last n lines of a file (default 10).
-
-$($PSStyle.Foreground.Green)nf$($PSStyle.Reset) <name> - Creates a new file with the specified name.
-
-$($PSStyle.Foreground.Green)mkcd$($PSStyle.Reset) <dir> - Creates and changes to a new directory.
-
-$($PSStyle.Foreground.Green)docs$($PSStyle.Reset) - Changes the current directory to the user's Documents folder.
-
-$($PSStyle.Foreground.Green)dtop$($PSStyle.Reset) - Changes the current directory to the user's Desktop folder.
-
-$($PSStyle.Foreground.Green)ep$($PSStyle.Reset) - Opens the profile for editing.
-
-$($PSStyle.Foreground.Green)k9$($PSStyle.Reset) <name> - Kills a process by name.
-
-$($PSStyle.Foreground.Green)la$($PSStyle.Reset) - Lists all files in the current directory with detailed formatting.
-
-$($PSStyle.Foreground.Green)ll$($PSStyle.Reset) - Lists all files, including hidden, in the current directory with detailed formatting.
-
-$($PSStyle.Foreground.Green)sysinfo$($PSStyle.Reset) - Displays detailed system information.
-
-$($PSStyle.Foreground.Green)flushdns$($PSStyle.Reset) - Clears the DNS cache.
-
-$($PSStyle.Foreground.Green)cpy$($PSStyle.Reset) <text> - Copies the specified text to the clipboard.
-
-$($PSStyle.Foreground.Green)pst$($PSStyle.Reset) - Retrieves text from the clipboard.
-
-Use '$($PSStyle.Foreground.Magenta)Show-Help$($PSStyle.Reset)' to display this help message.
-"@
-    Write-Host $helpText
+# Load User Customizations (Potentially from CTTcustom.ps1 or the AllHosts profile)
+# Ensure this path is correct for your setup
+$UserCustomProfilePath = Join-Path -Path $PSScriptRoot -ChildPath "CTTcustom.ps1" # Example path
+if (Test-Path $UserCustomProfilePath) {
+    Write-LogMessage -Message "Loading user customizations from '$UserCustomProfilePath'" -Level Information
+    try {
+        Invoke-Expression -Command "& `"$UserCustomProfilePath`"" # Consider dot-sourcing: . $UserCustomProfilePath
+    }
+    catch {
+        Write-LogMessage -Message "Error loading user customizations from '$UserCustomProfilePath': $_" -Level Error
+    }
 }
-
-if (Test-Path "$PSScriptRoot\CTTcustom.ps1") {
-    Invoke-Expression -Command "& `"$PSScriptRoot\CTTcustom.ps1`""
+else {
+    Write-LogMessage -Message "User customization file not found at '$UserCustomProfilePath'. Skipping." -Level Information
 }
-
-Write-Host "$($PSStyle.Foreground.Yellow)Use 'Show-Help' to display help$($PSStyle.Reset)"
 
 # Quick Access to Editing the Profile
-function Edit-Profile {
-    vim $PROFILE.CurrentUserAllHosts
+function Open-UserProfileScript {
+    <#
+   .SYNOPSIS
+   Opens the current user's 'AllHosts' profile script for editing using the configured editor ($EDITOR).
+   .DESCRIPTION
+   Identifies the profile script path for 'CurrentUserAllHosts' ($PROFILE.CurrentUserAllHosts)
+   and opens it using the editor determined earlier in the profile script ($EDITOR, e.g., vim, code, notepad).
+   This is the recommended place for user-specific, persistent customizations.
+   .EXAMPLE
+   Open-UserProfileScript
+   .NOTES
+   Alias: ep, Edit-Profile
+   #>
+    & $EDITOR $PROFILE.CurrentUserAllHosts
 }
-Set-Alias -Name ep -Value Edit-Profile
 #endregion
+#region Aliases
+# Consolidated aliases for built-in cmdlets, external tools, and renamed functions
+
+Write-LogMessage -Message "Setting profile aliases..." -Level Information
+
+# External Editor Alias (Based on $EDITOR detection)
+Set-Alias -Name vim -Value $EDITOR -Option AllScope -Force
+
+# --- Aliases for Renamed Functions (Original Name -> New Name) ---
+Set-Alias -Name Update-Profile                -Value Update-BaseProfile               -Option AllScope -Force
+Set-Alias -Name Update-PowerShell             -Value Invoke-PowerShellUpdateCheck    -Option AllScope -Force
+Set-Alias -Name Clear-Cache                   -Value Clear-SystemCache              -Option AllScope -Force
+Set-Alias -Name touch                         -Value New-EmptyFile                  -Option AllScope -Force
+Set-Alias -Name ff                            -Value Find-FileRecursive            -Option AllScope -Force
+Set-Alias -Name admin                         -Value Start-ElevatedProcess          -Option AllScope -Force
+Set-Alias -Name uptime                        -Value Get-SystemUptime               -Option AllScope -Force
+Set-Alias -Name unzip                         -Value Expand-ZipArchiveHere          -Option AllScope -Force
+Set-Alias -Name grep                          -Value Search-FileContent             -Option AllScope -Force
+Set-Alias -Name df                            -Value Get-DiskVolumeInfo             -Option AllScope -Force
+Set-Alias -Name sed                           -Value Replace-FileContent            -Option AllScope -Force
+Set-Alias -Name which                         -Value Get-CommandPath                -Option AllScope -Force
+Set-Alias -Name export                        -Value Set-TemporaryEnvironmentVariable -Option AllScope -Force
+Set-Alias -Name pkill                         -Value Stop-ProcessByName             -Option AllScope -Force
+Set-Alias -Name pgrep                         -Value Get-ProcessByName              -Option AllScope -Force
+Set-Alias -Name head                          -Value Get-FileHead                   -Option AllScope -Force
+Set-Alias -Name tail                          -Value Get-FileTail                   -Option AllScope -Force
+Set-Alias -Name nf                            -Value New-FileHere                   -Option AllScope -Force
+Set-Alias -Name mkcd                          -Value New-DirectoryAndEnter          -Option AllScope -Force
+Set-Alias -Name trash                         -Value Move-ItemToRecycleBin          -Option AllScope -Force
+Set-Alias -Name docs                          -Value Enter-DocumentsDirectory       -Option AllScope -Force
+Set-Alias -Name dtop                          -Value Enter-DesktopDirectory         -Option AllScope -Force
+Set-Alias -Name la                            -Value Get-ChildItemFormatted         -Option AllScope -Force
+Set-Alias -Name ll                            -Value Get-ChildItemFormattedHidden   -Option AllScope -Force
+Set-Alias -Name sysinfo                       -Value Get-SystemInformation          -Option AllScope -Force
+Set-Alias -Name flushdns                      -Value Clear-ClientDnsCache           -Option AllScope -Force
+Set-Alias -Name cpy                           -Value Set-ClipboardText              -Option AllScope -Force
+Set-Alias -Name pst                           -Value Get-ClipboardText              -Option AllScope -Force
+Set-Alias -Name Edit-Profile                  -Value Open-UserProfileScript         -Option AllScope -Force
+
+# --- Other Common Aliases ---
+Set-Alias -Name ep -Value Open-UserProfileScript -Option AllScope -Force # Short alias for editing profile
+Set-Alias -Name su -Value Start-ElevatedProcess -Option AllScope -Force # Unix sudo/su equivalent
+Set-Alias -Name k9 -Value Stop-ProcessByName -Option AllScope -Force # Quick process kill by name
+
+# Zoxide Aliases (Conditional initialization happens earlier)
+# These might be set by zoxide init itself, but defining here ensures they exist if init runs later or fails partially.
+# Check if Zoxide's function exists before setting alias, to avoid errors if Zoxide isn't setup
+if (Get-Command '__zoxide_z' -ErrorAction SilentlyContinue) {
+    Set-Alias -Name z -Value __zoxide_z -Option AllScope -Scope Global -Force
+}
+if (Get-Command '__zoxide_zi' -ErrorAction SilentlyContinue) {
+    Set-Alias -Name zi -Value __zoxide_zi -Option AllScope -Scope Global -Force
+}
+
+
+#endregion Aliases

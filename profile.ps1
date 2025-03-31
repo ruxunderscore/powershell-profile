@@ -1,5 +1,5 @@
 <# PowerShell Profile
-Version: 1.6
+Version: 1.7
 Last Updated: 2025-03-30
 Author: RuxUnderscore <https://github.com/ruxunderscore/>
 License: MIT License
@@ -12,7 +12,7 @@ Git integration, image processing, and system utilities.
 This profile provides a rich set of functions and configurations aimed at
 streamlining development workflows, media organization, and general PowerShell usage.
 It includes features like:
-- Robust helper functions for logging and admin checks.
+- Robust helper functions for logging and admin checks (Note: Core helpers now reside in base profile).
 - Advanced file/folder management: CBZ creation with metadata, PDF organization,
   sequential image/video renaming (including Plex/Jellyfin standards),
   permission management, numbered folder creation.
@@ -36,7 +36,7 @@ It includes features like:
 - 2025-03-30: Parameterized metadata (Writer, Genre, AgeRating, Manga, Language) in `Compress-ToCBZ`. Corrected ComicInfo <Count> tag usage. Adjusted XML heredoc formatting for cleanliness.
 - 2025-03-30: Added optional `-PublicationDate` parameter to `Compress-ToCBZ` with multi-format parsing to set Year/Month/Day in ComicInfo.xml.
 - 2025-03-30: Updated header format, added License and Synopsis.
-- 2025-03-30: Moved core helper functions (Write-LogMessage, Test-AdminRole) to Microsoft.Powershell_profile.ps1 (Base Profile) for earlier loading and wider availability.
+- 2025-03-30: Moved core helper functions (Write-LogMessage, Test-AdminRole) to Microsoft.Powershell_profile.ps1 (Base Profile). Moved Aliases region to end of script for better organization.
 #>
 
 #region Configuration
@@ -2006,6 +2006,20 @@ if ($availableDependencies['git']) {
 }
 #endregion
 
+#region Profile Initialization
+
+# Set custom window title
+$Host.UI.RawUI.WindowTitle = "PowerShell $($PSVersionTable.PSVersion.ToString())"
+
+# Create custom directory for temporary files if needed
+$CustomTempPath = Join-Path $env:USERPROFILE "PowerShell\temp"
+if (-not (Test-Path -Path $CustomTempPath)) {
+    New-Item -ItemType Directory -Path $CustomTempPath -Force | Out-Null
+}
+
+Write-LogMessage -Message "PowerShell profile loaded successfully" -Level Information
+#endregion
+
 #region Aliases
 
 Set-Alias -Name reload -Value Reload-Profile -Force
@@ -2034,18 +2048,4 @@ if ($availableDependencies['git']) {
     Set-Alias -Name lazyg -Value Git-LazyCommit -Force
 }
 
-#endregion
-
-#region Profile Initialization
-
-# Set custom window title
-$Host.UI.RawUI.WindowTitle = "PowerShell $($PSVersionTable.PSVersion.ToString())"
-
-# Create custom directory for temporary files if needed
-$CustomTempPath = Join-Path $env:USERPROFILE "PowerShell\temp"
-if (-not (Test-Path -Path $CustomTempPath)) {
-    New-Item -ItemType Directory -Path $CustomTempPath -Force | Out-Null
-}
-
-Write-LogMessage -Message "PowerShell profile loaded successfully" -Level Information
 #endregion
