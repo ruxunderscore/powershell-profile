@@ -33,10 +33,11 @@ irm "https://undersc.red/profile" | iex
 
 **What the installer does:**
 
-1. Checks for Admin rights and Internet connectivity.
-2. Installs dependencies: Chocolatey, Winget packages (Starship, Zoxide, Eza), PowerShell Modules (Terminal-Icons), and Nerd Fonts (Cascadia Code).
-3. Installs the **Base Profile** (`Microsoft.Powershell_profile.ps1`) to `$PROFILE`, backing up any existing file.
-4. **Prompts you** whether to download and install the **Advanced Profile** (`profile.ps1`) to `$PROFILE.CurrentUserAllHosts` (backing up if one exists there).
+1.  Checks for Admin rights and Internet connectivity.
+2.  Installs dependencies: Chocolatey, Winget packages (Starship, Zoxide, Eza), PowerShell Modules (Terminal-Icons), and Nerd Fonts (Cascadia Code).
+3.  Installs the **Shared Helper Functions** (`HelperFunctions.ps1`) required by the profiles.
+4.  Installs the **Base Profile** (`Microsoft.Powershell_profile.ps1`) (which uses the helpers) to `$PROFILE`, backing up any existing file.
+5.  **Prompts you** whether to download and install the **Advanced Profile** (`profile.ps1`) (which also uses the helpers) to `$PROFILE.CurrentUserAllHosts`, backing up any existing file.
 
 _Restart your PowerShell session after the setup completes!_
 
