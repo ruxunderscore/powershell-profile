@@ -36,7 +36,8 @@ This script serves as the primary PowerShell profile (`$PROFILE`). Key features 
 $debug = $false
 
 # Define the path to the file that stores the last execution time
-$timeFilePath = "$env:USERPROFILE\Documents\PowerShell\LastExecutionTime.txt"
+$currentDocumentFolder = $([Environment]::GetFolderPath('MyDocuments'))
+$timeFilePath = $(Join-Path -Path $currentDocumentFolder -ChildPath "\PowerShell\LastExecutionTime.txt")
 
 # Define the update interval in days, set to -1 to always check
 $updateInterval = 7
