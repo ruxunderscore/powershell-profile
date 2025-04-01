@@ -1069,7 +1069,7 @@ function Rename-NewSeriesEpisode {
     )
     
     # Remove PowerShell's auto-completion backticks from the file path
-    $cleanFilePath = $FilePath.Trim("`'") # Trim both backticks and single quotes potentially added by completion
+    $cleanFilePath = ($FilePath.Trim("`'") -replace '`', '') # Trim both backticks and single quotes potentially added by completion
     Write-Verbose "Original FilePath: $FilePath"
     Write-Verbose "Cleaned FilePath: $cleanFilePath"
 
@@ -2025,7 +2025,7 @@ Write-LogMessage -Message "PowerShell profile loaded successfully" -Level Inform
 
 #region Aliases
 
-Set-Alias -Name reload -Value Reload-Profile -Force
+Set-Alias -Name reload -Value Invoke-Profile -Force
 
 Set-Alias -Name rimg -Value Rename-ImageFilesSequentially -Force
 Set-Alias -Name mpdf -Value Move-PDFsToFolders -Force
