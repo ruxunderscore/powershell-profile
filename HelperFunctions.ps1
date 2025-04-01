@@ -158,6 +158,3 @@ function Reload-Profile {
 }
 
 #endregion Helper Functions
-
-# Optional: Export functions if treating like a module, though dot-sourcing is simpler for profiles.
-# Export-ModuleMember -Function Write-LogMessage, Test-AdminRole, Reload-Profile
