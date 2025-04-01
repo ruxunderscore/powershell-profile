@@ -1106,35 +1106,35 @@ Write-LogMessage -Message "Setting profile aliases..." -Level Information
 Set-Alias -Name vim -Value $EDITOR -Option AllScope -Force
 
 # --- Aliases for Renamed Functions (Original Name -> New Name) ---
-Set-Alias -Name Update-Profile                -Value Update-BaseProfile               -Option AllScope -Force
-Set-Alias -Name Update-PowerShell             -Value Invoke-PowerShellUpdateCheck    -Option AllScope -Force
-Set-Alias -Name Clear-Cache                   -Value Clear-SystemCache              -Option AllScope -Force
-Set-Alias -Name touch                         -Value New-EmptyFile                  -Option AllScope -Force
-Set-Alias -Name ff                            -Value Find-FileRecursive            -Option AllScope -Force
-Set-Alias -Name admin                         -Value Start-ElevatedProcess          -Option AllScope -Force
-Set-Alias -Name uptime                        -Value Get-SystemUptime               -Option AllScope -Force
-Set-Alias -Name unzip                         -Value Expand-ZipArchiveHere          -Option AllScope -Force
-Set-Alias -Name grep                          -Value Search-FileContent             -Option AllScope -Force
-Set-Alias -Name df                            -Value Get-DiskVolumeInfo             -Option AllScope -Force
-Set-Alias -Name sed                           -Value Replace-FileContent            -Option AllScope -Force
-Set-Alias -Name which                         -Value Get-CommandPath                -Option AllScope -Force
-Set-Alias -Name export                        -Value Set-TemporaryEnvironmentVariable -Option AllScope -Force
-Set-Alias -Name pkill                         -Value Stop-ProcessByName             -Option AllScope -Force
-Set-Alias -Name pgrep                         -Value Get-ProcessByName              -Option AllScope -Force
-Set-Alias -Name head                          -Value Get-FileHead                   -Option AllScope -Force
-Set-Alias -Name tail                          -Value Get-FileTail                   -Option AllScope -Force
-Set-Alias -Name nf                            -Value New-FileHere                   -Option AllScope -Force
-Set-Alias -Name mkcd                          -Value New-DirectoryAndEnter          -Option AllScope -Force
-Set-Alias -Name trash                         -Value Move-ItemToRecycleBin          -Option AllScope -Force
-Set-Alias -Name docs                          -Value Enter-DocumentsDirectory       -Option AllScope -Force
-Set-Alias -Name dtop                          -Value Enter-DesktopDirectory         -Option AllScope -Force
-Set-Alias -Name la                            -Value Get-ChildItemFormatted         -Option AllScope -Force
-Set-Alias -Name ll                            -Value Get-ChildItemFormattedHidden   -Option AllScope -Force
-Set-Alias -Name sysinfo                       -Value Get-SystemInformation          -Option AllScope -Force
-Set-Alias -Name flushdns                      -Value Clear-ClientDnsCache           -Option AllScope -Force
-Set-Alias -Name cpy                           -Value Set-ClipboardText              -Option AllScope -Force
-Set-Alias -Name pst                           -Value Get-ClipboardText              -Option AllScope -Force
-Set-Alias -Name Edit-Profile                  -Value Open-UserProfileScript         -Option AllScope -Force
+Set-Alias -Name Update-Profile                -Value Update-BaseProfile                 -Option AllScope -Force
+Set-Alias -Name Update-PowerShell             -Value Invoke-PowerShellUpdateCheck       -Option AllScope -Force
+Set-Alias -Name Clear-Cache                   -Value Clear-SystemCache                  -Option AllScope -Force
+Set-Alias -Name touch                         -Value New-EmptyFile                      -Option AllScope -Force
+Set-Alias -Name ff                            -Value Find-FileRecursive                 -Option AllScope -Force
+Set-Alias -Name admin                         -Value Start-ElevatedProcess              -Option AllScope -Force
+Set-Alias -Name uptime                        -Value Get-SystemUptime                   -Option AllScope -Force
+Set-Alias -Name unzip                         -Value Expand-ZipArchiveHere              -Option AllScope -Force
+Set-Alias -Name grep                          -Value Search-FileContent                 -Option AllScope -Force
+Set-Alias -Name df                            -Value Get-DiskVolumeInfo                 -Option AllScope -Force
+Set-Alias -Name sed                           -Value Replace-FileContent                -Option AllScope -Force
+Set-Alias -Name which                         -Value Get-CommandPath                    -Option AllScope -Force
+Set-Alias -Name export                        -Value Set-TemporaryEnvironmentVariable   -Option AllScope -Force
+Set-Alias -Name pkill                         -Value Stop-ProcessByName                 -Option AllScope -Force
+Set-Alias -Name pgrep                         -Value Get-ProcessByName                  -Option AllScope -Force
+Set-Alias -Name head                          -Value Get-FileHead                       -Option AllScope -Force
+Set-Alias -Name tail                          -Value Get-FileTail                       -Option AllScope -Force
+Set-Alias -Name nf                            -Value New-FileHere                       -Option AllScope -Force
+Set-Alias -Name mkcd                          -Value New-DirectoryAndEnter              -Option AllScope -Force
+Set-Alias -Name trash                         -Value Move-ItemToRecycleBin              -Option AllScope -Force
+Set-Alias -Name docs                          -Value Enter-DocumentsDirectory           -Option AllScope -Force
+Set-Alias -Name dtop                          -Value Enter-DesktopDirectory             -Option AllScope -Force
+Set-Alias -Name la                            -Value Get-ChildItemFormatted             -Option AllScope -Force
+function ll { Get-ChildItem -Force }
+Set-Alias -Name sysinfo                       -Value Get-SystemInformation              -Option AllScope -Force
+Set-Alias -Name flushdns                      -Value Clear-ClientDnsCache               -Option AllScope -Force
+Set-Alias -Name cpy                           -Value Set-ClipboardText                  -Option AllScope -Force
+Set-Alias -Name pst                           -Value Get-ClipboardText                  -Option AllScope -Force
+Set-Alias -Name Edit-Profile                  -Value Open-UserProfileScript             -Option AllScope -Force
 
 # --- Other Common Aliases ---
 Set-Alias -Name ep -Value Open-UserProfileScript -Option AllScope -Force # Short alias for editing profile
