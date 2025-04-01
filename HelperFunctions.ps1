@@ -158,3 +158,7 @@ function Reload-Profile {
 }
 
 #endregion Helper Functions
+
+#region Aliases
+Set-Alias -Name reload                -Value Reload-Profile                 -Option AllScope -Force
+#endregion Aliases
