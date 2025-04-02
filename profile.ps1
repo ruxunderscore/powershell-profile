@@ -2019,9 +2019,6 @@ Write-LogMessage -Message "PowerShell profile loaded successfully" -Level Inform
 #endregion
 
 #region Aliases
-
-Set-Alias -Name reload -Value Invoke-Profile -Force
-
 Set-Alias -Name rimg -Value Rename-ImageFilesSequentially -Force
 Set-Alias -Name mpdf -Value Move-PDFsToFolders -Force
 Set-Alias -Name cbz -Value Compress-ToCBZ -Force
