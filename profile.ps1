@@ -1754,7 +1754,7 @@ function Invoke-WinUtil {
     .SYNOPSIS
     Runs the latest WinUtil full-release script from Chris Titus Tech.
     .DESCRIPTION
-    Downloads and executes the WinUtil script using Invoke-Expression (iex).
+    Downloads and executes the WinUtil script using Invoke-Expression.
     .EXAMPLE
     Invoke-WinUtil
     .NOTES
@@ -1762,7 +1762,7 @@ function Invoke-WinUtil {
     #>
     [CmdletBinding()]
     param()
-    irm https://christitus.com/win | iex
+    Invoke-RestMethod https://christitus.com/win | Invoke-Expression
 }
 
 function Invoke-WinUtilDev {
@@ -1770,7 +1770,7 @@ function Invoke-WinUtilDev {
     .SYNOPSIS
     Runs the latest WinUtil pre-release script from Chris Titus Tech.
     .DESCRIPTION
-    Downloads and executes the WinUtil development script using Invoke-Expression (iex).
+    Downloads and executes the WinUtil development script using Invoke-Expression.
     .EXAMPLE
     Invoke-WinUtilDev
     .NOTES
@@ -1778,7 +1778,7 @@ function Invoke-WinUtilDev {
     #>
     [CmdletBinding()]
     param()
-    irm https://christitus.com/windev | iex
+    Invoke-RestMethod https://christitus.com/windev | Invoke-Expression
 }
 
 function Upload-Hastebin {
