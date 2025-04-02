@@ -370,7 +370,7 @@ function Compress-ToCBZ {
                 try {
                     # Use CurrentCulture for locale-specific settings (like month names, separators)
                     # AllowWhiteSpaces helps with slight variations in user input
-                    $parsedDate = [DateTime]::ParseExact($PublicationDate.Trim(), $formats, [System.Globalization.CultureInfo]::CurrentCulture, [System.Globalization.DateTimeStyles]::AllowWhiteSpaces)
+                    $parsedDate = [DateTime]::ParseExact($PublicationDate.Trim(), $formats, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AllowWhiteSpaces) # <-- MODIFIED LINE
                     Write-Verbose "Successfully parsed PublicationDate '$PublicationDate' to '$($parsedDate.ToString('yyyy-MM-dd'))'."
 
                     # Extract components if parsing succeeded
@@ -466,7 +466,15 @@ function Compress-ToCBZ {
 
         }
         catch {
-            Write-LogMessage -Message "Error during CBZ compression for path '$Path': $_" -Level Error
+            try {
+                # Construct the original error message string including the path variable
+                $errorMessage = "Error during CBZ compression for path '$Path': $_"
+                Write-LogMessage -Message $errorMessage -Level Error -ErrorAction Stop # Use ErrorAction Stop inside this try
+            }
+            catch {
+                # If Write-LogMessage failed, just write the ORIGINAL error ($_) to the error stream
+                Write-Error "Original Error Caught (Logging Failed): $_"
+            }
             # Clean up temp XML if error occurred after creating it but before removing it
             if ($PSCmdlet.ShouldProcess($comicInfoXmlPath, "Attempt cleanup of temporary ComicInfo.xml after error")) {
                 if (Test-Path $comicInfoXmlPath) { Remove-Item -Path $comicInfoXmlPath -Force -ErrorAction SilentlyContinue }
