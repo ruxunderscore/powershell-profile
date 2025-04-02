@@ -370,7 +370,7 @@ function Compress-ToCBZ {
                 try {
                     # Use CurrentCulture for locale-specific settings (like month names, separators)
                     # AllowWhiteSpaces helps with slight variations in user input
-                    $parsedDate = [DateTime]::ParseExact($PublicationDate.Trim(), $formats, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AllowWhiteSpaces) # <-- MODIFIED LINE
+                    $parsedDate = [DateTime]::ParseExact($PublicationDate.Trim(), "yyyy-MM-dd", [System.Globalization.CultureInfo]::InvariantCulture)
                     Write-Verbose "Successfully parsed PublicationDate '$PublicationDate' to '$($parsedDate.ToString('yyyy-MM-dd'))'."
 
                     # Extract components if parsing succeeded
@@ -382,7 +382,7 @@ function Compress-ToCBZ {
                 }
                 catch {
                     # Log a warning if parsing fails, leave Year/Month/Day blank
-                    Write-LogMessage -Level Warning -Message "Could not parse provided PublicationDate '$PublicationDate' using expected formats (e.g., yyyy-MM-dd, MM/dd/yyyy, yyyy). Year/Month/Day tags will be empty. Error: $($_.Exception.Message)"
+                    Write-LogMessage -Level Warning -Message "Could not parse provided PublicationDate '$PublicationDate' using format 'yyyy-MM-dd'. Year/Month/Day tags will be empty. Error: $($_.Exception.Message)"
                     # Reset variables just in case (should already be empty)
                     $xmlYear = ''
                     $xmlMonth = ''
@@ -473,7 +473,10 @@ function Compress-ToCBZ {
             }
             catch {
                 # If Write-LogMessage failed, just write the ORIGINAL error ($_) to the error stream
-                Write-Error "Original Error Caught (Logging Failed): $_"
+                $originalError = $_
+
+                # Directly write the captured error object details
+                Write-Error "Compress-ToCBZ Failed! Original Error Details: $($originalError | Out-String)"
             }
             # Clean up temp XML if error occurred after creating it but before removing it
             if ($PSCmdlet.ShouldProcess($comicInfoXmlPath, "Attempt cleanup of temporary ComicInfo.xml after error")) {
