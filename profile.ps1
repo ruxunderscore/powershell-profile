@@ -1335,7 +1335,7 @@ function New-ChapterFolders {
         [string]$BasePath = (Get-Location)
     )
     # Call the generic function, passing the specific format
-    New-NumberedFolders -MinNumber $MinimumChapter -MaxNumber $MaximumChapter -NameFormat "Chapter {0:D3}" -BasePath $BasePath @PSBoundParameters
+    New-NumberedFolders -MinNumber $MinimumChapter -MaxNumber $MaximumChapter -NameFormat "Chapter {0:D3}" -BasePath $BasePath
 }
 
 function New-SeasonFolders {
@@ -1366,7 +1366,7 @@ function New-SeasonFolders {
         [string]$BasePath = (Get-Location)
     )
     # Call the generic function, passing the specific format
-    New-NumberedFolders -MinNumber $MinimumSeason -MaxNumber $MaximumSeason -NameFormat "season {0:D2}" -BasePath $BasePath @PSBoundParameters
+    New-NumberedFolders -MinNumber $MinimumSeason -MaxNumber $MaximumSeason -NameFormat "season {0:D2}" -BasePath $BasePath
 }
 #endregion
 
