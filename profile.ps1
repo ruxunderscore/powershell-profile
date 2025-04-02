@@ -267,7 +267,7 @@ function Compress-ToCBZ {
     [Optional] Specifies the AgeRating tag for the ComicInfo.xml.
     .PARAMETER PublicationDate
     [Optional] Specifies the publication date for the ComicInfo.xml (Year, Month, Day tags).
-    Accepts various common formats (e.g., "YYYY-MM-DD", "MM/DD/YYYY", "YYYY", "YYYY-MM").
+    Accepts "YYYY-MM-DD".
     If omitted or unparseable, the Year/Month/Day tags will be empty.
     .PARAMETER LanguageISO
     [Optional] Specifies the LanguageISO tag for the ComicInfo.xml (e.g., 'en', 'ja'). Defaults to 'en'.
@@ -276,20 +276,17 @@ function Compress-ToCBZ {
     .EXAMPLE
     PS C:\Comics\My Indie Comic\Chapter 001> Compress-ToCBZ -seriesWriter "Creator Name" -PublicationDate "2024-11-15"
     Creates CBZ using specified writer and sets Year=2024, Month=11, Day=15 in ComicInfo.xml.
-    .EXAMPLE
-    PS C:\Comics\Old Comic\Issue 1> Compress-ToCBZ -PublicationDate "1998"
-    Creates CBZ, setting only Year=1998 in ComicInfo.xml (Month/Day will default to 01/01 from parser, or be blank if parsing adjusted).
     .NOTES
     - Relies heavily on the parent/grandparent folder names matching 'Volume #' and 'Chapter #'.
     - Uses Write-LogMessage for logging progress and errors.
     - Supports -WhatIf.
-    - Publication Date parsing accepts formats like "yyyy-MM-dd", "yyyy/MM/dd", "MM/dd/yyyy", "M/d/yyyy", "dd-MMM-yyyy", "yyyy-MM", "yyyy".
+    - Publication Date parsing accepts "yyyy-MM-dd" as the format.
     - If PublicationDate cannot be parsed, Year/Month/Day tags will be empty.
     #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param (
         [Parameter(Mandatory = $false)]
-        [string]$Path = ".",
+        [string]$Path = (Get-Location).Path, # Corrected default from "." to specific Path property
 
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -323,6 +320,9 @@ function Compress-ToCBZ {
     }
 
     process {
+        # Define $comicInfoXmlPath early so it's available in catch block for cleanup
+        $comicInfoXmlPath = Join-Path -Path $Path -ChildPath "ComicInfo.xml"
+        
         try {
             # Get the current directory name and its parent
             $currentDir = Split-Path -Leaf (Resolve-Path $Path)
@@ -356,33 +356,22 @@ function Compress-ToCBZ {
 
             # Check if the user provided the parameter and it's not just whitespace
             if ($PSBoundParameters.ContainsKey('PublicationDate') -and -not [string]::IsNullOrWhiteSpace($PublicationDate)) {
-                # Define the formats we want to try parsing
-                $formats = @(
-                    "yyyy-MM-dd",
-                    "yyyy/MM/dd",
-                    "MM/dd/yyyy",
-                    "M/d/yyyy", # Month/Day without leading zero
-                    "dd-MMM-yyyy", # e.g., 30-Mar-2025
-                    "yyyy-MM", # Year and Month only
-                    "yyyy"         # Year only
-                )
                 Write-Verbose "Attempting to parse PublicationDate: '$PublicationDate'"
                 try {
-                    # Use CurrentCulture for locale-specific settings (like month names, separators)
-                    # AllowWhiteSpaces helps with slight variations in user input
-                    $parsedDate = [DateTime]::ParseExact($PublicationDate.Trim(), "yyyy-MM-dd", [System.Globalization.CultureInfo]::InvariantCulture)
+                    # Use only the single format string and InvariantCulture:
+                    $parsedDate = [DateTime]::ParseExact($PublicationDate.Trim(), "yyyy-MM-dd", [System.Globalization.CultureInfo]::InvariantCulture) # <-- Simplified ParseExact
                     Write-Verbose "Successfully parsed PublicationDate '$PublicationDate' to '$($parsedDate.ToString('yyyy-MM-dd'))'."
 
                     # Extract components if parsing succeeded
                     $xmlYear = $parsedDate.Year.ToString() # Ensure it's a string
-                    # ParseExact sets Month/Day to 1 if only Year/Month or Year provided; outputting these is usually acceptable.
                     $xmlMonth = $parsedDate.Month.ToString("00")
                     $xmlDay = $parsedDate.Day.ToString("00")
 
                 }
                 catch {
+                    # --- MODIFIED INNER CATCH: Use Write-Warning ---
                     # Log a warning if parsing fails, leave Year/Month/Day blank
-                    Write-LogMessage -Level Warning -Message "Could not parse provided PublicationDate '$PublicationDate' using format 'yyyy-MM-dd'. Year/Month/Day tags will be empty. Error: $($_.Exception.Message)"
+                    Write-Warning "Could not parse provided PublicationDate '$PublicationDate' using format 'yyyy-MM-dd'. Year/Month/Day tags will be empty. Error: $($_.Exception.Message)"
                     # Reset variables just in case (should already be empty)
                     $xmlYear = ''
                     $xmlMonth = ''
@@ -429,10 +418,11 @@ function Compress-ToCBZ {
 </ComicInfo>
 "@
 
-            $comicInfoXmlPath = Join-Path -Path $Path -ChildPath "ComicInfo.xml"
+            # Define CBZ path info ($comicInfoXmlPath defined earlier)
             $cbzFileName = "{0} Vol.{1:D3} Ch.{2:D3}.cbz" -f $seriesTitle, $volumeNumber, $chapterNumber
             # Place CBZ in the PARENT directory (e.g., the Volume folder or Series folder)
-            $cbzDestinationDir = (Resolve-Path $Path).Parent.FullName
+            $parentPath = Split-Path -Parent (Resolve-Path $Path)   # Get the immediate parent path
+            $cbzDestinationDir = Split-Path -Parent $parentPath     # Get the parent of the parent
             $cbzFullPath = Join-Path -Path $cbzDestinationDir -ChildPath $cbzFileName
 
             if ((Test-Path $cbzFullPath) -and -not $Force) {
@@ -451,7 +441,7 @@ function Compress-ToCBZ {
             # Action 2: Compress files to CBZ
             if ($PSCmdlet.ShouldProcess($cbzFullPath, "Create CBZ archive from contents of '$($Path)'")) {
                 # Ensure we are compressing items *inside* the target Path
-                Compress-Archive -Path (Join-Path -Path $Path -ChildPath '*') -DestinationPath $cbzFullPath -Force -ErrorAction Stop
+                Compress-Archive -Path (Join-Path -Path $Path -ChildPath '*') -DestinationPath $cbzFullPath -Force:$Force -ErrorAction Stop # Pass $Force switch
                 Write-LogMessage -Message "Created $cbzFileName (in $cbzDestinationDir) with $pageCount pages" -Level Information
                 Write-Verbose "Successfully created '$cbzFileName' in '$cbzDestinationDir'."
             }
@@ -464,33 +454,27 @@ function Compress-ToCBZ {
                 }
             }
 
-        }
+        } # End of main 'try' block
+        # --- MODIFIED OUTER CATCH BLOCK ---
         catch {
-            try {
-                # Construct the original error message string including the path variable
-                $errorMessage = "Error during CBZ compression for path '$Path': $_"
-                Write-LogMessage -Message $errorMessage -Level Error -ErrorAction Stop # Use ErrorAction Stop inside this try
-            }
-            catch {
-                # If Write-LogMessage failed, just write the ORIGINAL error ($_) to the error stream
-                $originalError = $_
-
-                # Directly write the captured error object details
-                Write-Error "Compress-ToCBZ Failed! Original Error Details: $($originalError | Out-String)"
-            }
-            # Clean up temp XML if error occurred after creating it but before removing it
+            Write-Warning "DEBUG: Outer catch triggered. Original error follows:"
+            
+            # Attempt cleanup (moved before throw)
             if ($PSCmdlet.ShouldProcess($comicInfoXmlPath, "Attempt cleanup of temporary ComicInfo.xml after error")) {
-                if (Test-Path $comicInfoXmlPath) { Remove-Item -Path $comicInfoXmlPath -Force -ErrorAction SilentlyContinue }
+                 if (Test-Path $comicInfoXmlPath) { Remove-Item -Path $comicInfoXmlPath -Force -ErrorAction SilentlyContinue }
             }
-            throw
+
+            throw # Let PowerShell print the original error ($_)
         }
-    }
+        # --- END OF MODIFIED OUTER CATCH BLOCK ---
+    } # End of 'process' block
+
     end {
         Write-Information "CBZ compression process completed for path '$Path'."
         Write-Information "MangaManager is recommended to make any further adjustments to the created CBZ file's metadata (ComicInfo.xml)." # Suggestion for next steps
         Write-Information "Get it here: https://github.com/MangaManagerORG/Manga-Manager"
     }
-}
+} # End of function Compress-ToCBZ
 
 function Move-PDFsToFolders {
     <#
