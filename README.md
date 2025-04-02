@@ -23,21 +23,32 @@ A functional and enhanced PowerShell environment, initially based on [ChrisTitus
     - Robust dependency checking for its advanced features.
     - _Optionally_ installed during setup to `$PROFILE.CurrentUserAllHosts`.
 
+## 📜 Profile Scripts
+
+This repository contains the following core scripts:
+
+- **`Microsoft.Powershell_profile.ps1`:** The self-updating base profile installed to `$PROFILE`. See features above.
+- **`profile.ps1`:** The advanced user profile script. ([See Documentation](./docs/advanced_profile.md))
+- **`HelperFunctions.ps1`:** Shared functions required by both profile scripts.
+- **`setup.ps1`:** The setup script used for installation.
+
 ## ⚡ One Line Install (Elevated PowerShell Recommended)
 
 Execute the following command in an **elevated** PowerShell window to run the setup script:
 
-```powershell
+PowerShell
+
+```
 irm "https://undersc.red/profile" | iex
 ```
 
 **What the installer does:**
 
-1.  Checks for Admin rights and Internet connectivity.
-2.  Installs dependencies: Chocolatey, Winget packages (Starship, Zoxide, Eza), PowerShell Modules (Terminal-Icons), and Nerd Fonts (Cascadia Code).
-3.  Installs the **Shared Helper Functions** (`HelperFunctions.ps1`) required by the profiles.
-4.  Installs the **Base Profile** (`Microsoft.Powershell_profile.ps1`) (which uses the helpers) to `$PROFILE`, backing up any existing file.
-5.  **Prompts you** whether to download and install the **Advanced Profile** (`profile.ps1`) (which also uses the helpers) to `$PROFILE.CurrentUserAllHosts`, backing up any existing file.
+1. Checks for Admin rights and Internet connectivity.
+2. Installs dependencies: Chocolatey, Winget packages (Starship, Zoxide, Eza), PowerShell Modules (Terminal-Icons), and Nerd Fonts (Cascadia Code).
+3. Installs the **Shared Helper Functions** (`HelperFunctions.ps1`) required by the profiles.
+4. Installs the **Base Profile** (`Microsoft.Powershell_profile.ps1`) (which uses the helpers) to `$PROFILE`, backing up any existing file.
+5. **Prompts you** whether to download and install the **Advanced Profile** (`profile.ps1`) (which also uses the helpers) to `$PROFILE.CurrentUserAllHosts`, backing up any existing file.
 
 _Restart your PowerShell session after the setup completes!_
 
