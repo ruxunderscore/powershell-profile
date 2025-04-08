@@ -210,7 +210,7 @@ function New-NumberedFolders {
                 throw "Invalid NameFormat string." # Stop processing if format is bad
             }
 
-            $folderPath = Join-Path -Path $BasePath -ChildPath $folderName
+            $folderPath = Join-Path -LiteralPath $BasePath -ChildPath $folderName
 
             if (-not (Test-Path $folderPath -PathType Container)) {
                 # Check specifically for container
@@ -218,7 +218,7 @@ function New-NumberedFolders {
                 if ($PSCmdlet.ShouldProcess($folderPath, "Create Directory using format '$NameFormat'")) {
                     Write-Verbose "Creating folder: $folderPath"
                     try {
-                        New-Item -Path $folderPath -ItemType Directory -Force -ErrorAction Stop | Out-Null
+                        New-Item -LiteralPath $folderPath -ItemType Directory -Force -ErrorAction Stop | Out-Null
                     }
                     catch {
                         Write-LogMessage -Level Error -Message "Failed to create folder '$folderPath': $_"
