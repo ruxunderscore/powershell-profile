@@ -1,5 +1,5 @@
 <# PowerShell Profile
-Version: 1.7
+Version: 1.7.1
 Last Updated: 2025-03-30
 Author: RuxUnderscore <https://github.com/ruxunderscore/>
 License: MIT License
@@ -37,6 +37,7 @@ It includes features like:
 - 2025-03-30: Added optional `-PublicationDate` parameter to `Compress-ToCBZ` with multi-format parsing to set Year/Month/Day in ComicInfo.xml.
 - 2025-03-30: Updated header format, added License and Synopsis.
 - 2025-03-30: Moved core helper functions (Write-LogMessage, Test-AdminRole) to Microsoft.Powershell_profile.ps1 (Base Profile). Moved Aliases region to end of script for better organization.
+- 2025-04-07: Changed SeriesName handling in New-SeriesEpisodes and other fixes
 #>
 
 #region Configuration
@@ -61,7 +62,7 @@ $requiredModules = @(
 )
 
 foreach ($module in $requiredModules) {
-    if (-not (Get-Module -ListAvailable -Name $module.Name | 
+    if (-not (Get-Module -ListAvailable -Name $module.Name |
             Where-Object { $_.Version -ge $module.MinimumVersion })) {
         Write-Warning "Required module $($module.Name) (>= $($module.MinimumVersion)) is not installed."
     }
@@ -88,7 +89,7 @@ function Test-ExternalDependency {
         [string]$Command,
         [string]$ErrorMessage
     )
-    
+
     if (-not (Get-Command $Command -ErrorAction SilentlyContinue)) {
         Write-Warning $ErrorMessage
         return $false
@@ -322,7 +323,7 @@ function Compress-ToCBZ {
     process {
         # Define $comicInfoXmlPath early so it's available in catch block for cleanup
         $comicInfoXmlPath = Join-Path -Path $Path -ChildPath "ComicInfo.xml"
-        
+
         try {
             # Get the current directory name and its parent
             $currentDir = Split-Path -Leaf (Resolve-Path $Path)
@@ -383,7 +384,7 @@ function Compress-ToCBZ {
                 Write-Verbose "No PublicationDate provided. Year/Month/Day tags will be empty."
             }
             # --- END: Date Parsing Logic ---
-            
+
             $pageCount = (Get-ChildItem -Path $Path -File | Where-Object { $_.Name -ne "ComicInfo.xml" } | Measure-Object).Count # Added Path
 
             # Create ComicInfo.xml content
@@ -458,7 +459,7 @@ function Compress-ToCBZ {
         # --- MODIFIED OUTER CATCH BLOCK ---
         catch {
             Write-Warning "DEBUG: Outer catch triggered. Original error follows:"
-            
+
             # Attempt cleanup (moved before throw)
             if ($PSCmdlet.ShouldProcess($comicInfoXmlPath, "Attempt cleanup of temporary ComicInfo.xml after error")) {
                  if (Test-Path $comicInfoXmlPath) { Remove-Item -Path $comicInfoXmlPath -Force -ErrorAction SilentlyContinue }
@@ -723,9 +724,9 @@ function Rename-NumberedFiles {
     # Sort files numerically
     $sortedFiles = $numericFiles | Sort-Object { [int]($_.BaseName) }
 
-    if ($sortedFiles.Count -eq 0) { 
+    if ($sortedFiles.Count -eq 0) {
         Write-Verbose "No files with purely numeric names found in '$Path'."
-        return 
+        return
     }
 
     # Get the maximum number of digits
@@ -760,16 +761,16 @@ function Set-StandardSeasonFolderNames {
     <#
     .SYNOPSIS
     Renames season folders in the current directory to a standard 'season XX' format.
-    
+
     .DESCRIPTION
     Searches the current directory for folders whose names match patterns like 'season 1', 'Season_02', etc.
     It extracts the season number and renames the folder to the standard 'season XX' format (e.g., 'season 01', 'season 02'), ensuring a two-digit padded number.
-    
+
     .EXAMPLE
     PS C:\MySeries> Set-StandardSeasonFolderNames
     Looks for folders like 'season 1', 'season_2', 'Season 03' in C:\MySeries and renames them to
     'season 01', 'season 02', 'season 03' respectively.
-    
+
     .NOTES
     - Only operates in the current directory.
     - Looks for folders starting with 'season' (case-insensitive), potentially followed by whitespace or underscore, then digits.
@@ -838,38 +839,38 @@ function Rename-SeriesEpisodes {
     <#
     .SYNOPSIS
     Renames video files within season folders (or the current folder) to a standard series episode format.
-    
+
     .DESCRIPTION
     This function processes video files (mkv, mp4, avi, etc.) located within 'season XX' subfolders of the current directory,
     or directly within the current directory if no season folders are found.
     It renames the files sequentially to the standard Plex/Jellyfin format: 'series_name_sXXeYY.ext'.
-    
+
     The series name is derived from the first file found unless provided via the SeriesName parameter.
     Season numbers (sXX) are derived from the 'season XX' folder names or use the DefaultSeason parameter.
     Episode numbers (eYY) are assigned sequentially based on the sorted file list within each season.
-    
+
     The function attempts to clean common group tags (e.g., '[Group]') from the beginning of original filenames
     before attempting to derive the series name.
-    
+
     .PARAMETER SeriesName
     An optional string specifying the series name to use in the renamed files. Spaces will be replaced with underscores.
     If not provided, the function attempts to derive the name from the first video file found in the first season folder (or current directory).
-    
+
     .PARAMETER DefaultSeason
     The season number (integer) to use if processing files outside of a 'season XX' folder structure, or if a folder name doesn't match the pattern. Defaults to 1.
-    
+
     .EXAMPLE
     PS C:\Path\To\My Show> Rename-SeriesEpisodes
     Processes 'season 01', 'season 02' subfolders, derives the series name, and renames episodes like 'my_show_s01e01.mkv', 'my_show_s02e01.mkv', etc.
-    
+
     .EXAMPLE
     PS C:\Path\To\My Show\season 03> Rename-SeriesEpisodes -SeriesName "My Awesome Show"
     Processes only the current 'season 03' folder, using the provided series name, resulting in files like 'my_awesome_show_s03e01.mkv', etc.
-    
+
     .EXAMPLE
     PS C:\Path\To\My Show\Specials> Rename-SeriesEpisodes -DefaultSeason 0
     Processes files in the current 'Specials' directory, using season number 0 (s00) and deriving the series name, e.g., 'my_show_s00e01.mkv'.
-    
+
     .NOTES
     - Supported video extensions: .mkv, .mp4, .avi, .mov, .wmv, .m4v.
     - Deriving the series name from filenames can be unreliable if filenames are inconsistent. Providing -SeriesName is recommended for accuracy.
@@ -935,6 +936,7 @@ function Rename-SeriesEpisodes {
                 # Added period as separator
                 $derivedSeriesName = ($Matches[1].Trim() -replace '\s+', '_').ToLower()
                 Write-Verbose "Derived SeriesName: $derivedSeriesName"
+                $effectiveSeriesName = $derivedSeriesName
             }
             else {
                 Write-LogMessage -Level Warning -Message "Could not derive series name from first file: $($firstFileSorted.Name)"
@@ -944,8 +946,11 @@ function Rename-SeriesEpisodes {
             Write-LogMessage -Level Warning -Message "No video files found in first folder ($($seasonFolders[0].Name)) to derive series name."
         }
     }
+    else {
+      $effectiveSeriesName = $SeriesName
+    }
     # Use provided SeriesName or the derived one
-    $effectiveSeriesName = $SeriesName -or $derivedSeriesName
+    # $effectiveSeriesName = $SeriesName -or $derivedSeriesName
 
     if (-not $effectiveSeriesName) {
         Write-LogMessage -Level Error -Message "Cannot proceed without a SeriesName (either provide one or ensure files allow derivation)."
@@ -1028,27 +1033,27 @@ function Rename-NewSeriesEpisode {
     <#
     .SYNOPSIS
     Renames a single new video episode file to the standard 'series_name_sXXeYY.ext' format based on existing files in the same directory.
-    
+
     .DESCRIPTION
     This function takes the path to a single video file (e.g., a newly downloaded episode).
     It examines other video files (currently .mkv) in the same directory that already match the 'series_name_sXXeYY.mkv' pattern.
     It determines the correct Series Name and Season Number (sXX) from the existing files with the highest episode number.
     It then calculates the next sequential Episode Number (eYY) and renames the input file accordingly.
-    
+
     If no correctly named existing files are found, it attempts to parse the Series Name from the input filename
     (using a common pattern like '[Group] Series Name - 01 ...') and assumes it's Season 01, Episode 01.
-    
+
     .PARAMETER FilePath
     The full path to the single video file that needs to be renamed. The path can be quoted and contain spaces. Backticks from tab-completion are handled.
-    
+
     .EXAMPLE
     PS C:\MyShow\Season 02> Rename-NewSeriesEpisode -FilePath '.\[Subs] My Show - 15 [1080p].mkv'
     Assuming 'my_show_s02e14.mkv' exists, this renames the new file to 'my_show_s02e15.mkv'.
-    
+
     .EXAMPLE
     PS C:\MyShow\Season 01> Rename-NewSeriesEpisode -FilePath '.\First.Episode.S01E01.mkv'
     If no other 'my_show_s01eXX.mkv' files exist, it might try to derive 'my_show' (depending on parsing logic) and rename it to 'my_show_s01e01.mkv'.
-    
+
     .NOTES
     - Works for TV Shows, Anime, and other series following a Season/Episode structure.
     - Checks if the input file extension is in the globally defined list ($global:DefaultVideoCheckExtensions).
@@ -1062,7 +1067,7 @@ function Rename-NewSeriesEpisode {
         [Parameter(Mandatory = $true)]
         [string]$FilePath
     )
-    
+
     # Remove PowerShell's auto-completion backticks from the file path
     $cleanFilePath = ($FilePath.Trim("`'") -replace '`', '') # Trim both backticks and single quotes potentially added by completion
     Write-Verbose "Original FilePath: $FilePath"
@@ -1424,69 +1429,69 @@ function Convert-ImageFormat {
         if (-not $availableDependencies['magick']) {
             $errorMsg = "ImageMagick required..."
             Write-LogMessage -Message $errorMsg -Level Error -LogPath $LogPath
-            throw $errorMsg 
+            throw $errorMsg
         }
         $OutputPath = (Resolve-Path -Path $OutputPath -ErrorAction Stop).Path
         if (-not (Test-Path -Path $OutputPath)) {
             try {
                 New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
-                Write-LogMessage -Message "Created output directory: $OutputPath" -Level Information -LogPath $LogPath 
+                Write-LogMessage -Message "Created output directory: $OutputPath" -Level Information -LogPath $LogPath
             }
             catch {
                 Write-LogMessage -Message "Failed to create output directory: $_" -Level Error -LogPath $LogPath
-                throw 
-            } 
+                throw
+            }
         }
         $supportedFormats = @('jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'heic', 'pdf', 'svg')
         if ($InputFormat -notin $supportedFormats) {
             $errorMsg = "Input format '$InputFormat' not supported..."
             Write-LogMessage -Message $errorMsg -Level Error -LogPath $LogPath
-            throw $errorMsg 
+            throw $errorMsg
         }
         if ($OutputFormat -notin $supportedFormats) {
             $errorMsg = "Output format '$OutputFormat' not supported..."
             Write-LogMessage -Message $errorMsg -Level Error -LogPath $LogPath
-            throw $errorMsg 
+            throw $errorMsg
         }
-        Write-LogMessage -Message "Starting batch conversion: $InputFormat -> $OutputFormat" -Level Information -LogPath $LogPath 
+        Write-LogMessage -Message "Starting batch conversion: $InputFormat -> $OutputFormat" -Level Information -LogPath $LogPath
     }
 
     process {
         foreach ($currentPath in $Path) {
             try {
                 $resolvedPath = (Resolve-Path -Path $currentPath -ErrorAction Stop).Path
-                Write-LogMessage -Message "Processing directory: $resolvedPath" -Level Information -LogPath $LogPath 
+                Write-LogMessage -Message "Processing directory: $resolvedPath" -Level Information -LogPath $LogPath
             }
             catch {
                 Write-LogMessage -Message "Failed to resolve path $currentPath : $_" -Level Error -LogPath $LogPath
-                continue 
+                continue
             }
             try {
                 $imageFiles = Get-ChildItem -Path $resolvedPath -Filter "*.$InputFormat" -File -ErrorAction Stop
             }
             catch {
                 Write-LogMessage -Message "Error accessing directory $resolvedPath : $_" -Level Error -LogPath $LogPath
-                continue 
+                continue
             }
             if ($imageFiles.Count -eq 0) {
                 Write-LogMessage -Message "No .$InputFormat files found in $resolvedPath" -Level Warning -LogPath $LogPath
-                continue 
+                continue
             }
 
             foreach ($imageFile in $imageFiles) {
                 $outputFilePath = Join-Path -Path $OutputPath -ChildPath ($imageFile.BaseName + ".$OutputFormat"); $magickArgs = @('convert', "`"$($imageFile.FullName)`""); # ... (add optimize/quality args) ...
-                 
+
                 if ($Optimize) {
                     switch ($OutputFormat.ToLower()) {
                         'jpg' { $magickArgs += @('-strip', '-interlace', 'Plane') }
                         'jpeg' { $magickArgs += @('-strip', '-interlace', 'Plane') }
                         'png' { $magickArgs += @('-strip', '-define', 'png:compression-level=9') }
-                        'webp' { $magickArgs += @('-define', 'webp:lossless=true') } 
+                        'webp' { $magickArgs += @('-define', 'webp:lossless=true') }
                     }
-                    Write-LogMessage -Message "Applied optimization settings for $OutputFormat" -Level Information -LogPath $LogPath 
+                    Write-LogMessage -Message "Applied optimization settings for $OutputFormat" -Level Information -LogPath $LogPath
                 }
                 if ($OutputFormat -in @('jpg', 'jpeg', 'webp')) {
-                    $magickArgs += @('-quality', $Quality) 
+                    $magickArgs += @('-quality', $Quality)
                 }
                 $magickArgs += "`"$outputFilePath`""
 
@@ -1495,7 +1500,7 @@ function Convert-ImageFormat {
                     Write-LogMessage -Message "Processing: $($imageFile.FullName)" -Level Information -LogPath $LogPath # Keep detailed log
                     $cmdString = "magick $($magickArgs -join ' ')"
                     Write-Verbose "Executing command: $cmdString" # Use Verbose for console command view
-                    
+
                     # We can't make Start-Process respect -WhatIf for the magick command itself,
                     # but we proceed assuming conversion happens for the potential Remove-Item step.
                     $process = Start-Process -FilePath 'magick' -ArgumentList $magickArgs -Wait -NoNewWindow -PassThru
@@ -1572,11 +1577,11 @@ function Get-VideoInfo {
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
         [string[]]$Path,
-        
+
         [switch]$IncludeAudio,
         [switch]$IncludeSubtitles
     )
-    
+
     begin {
         if (-not $availableDependencies['ffprobe']) {
             throw "FFprobe is required for this function but was not found."
@@ -1627,7 +1632,7 @@ function New-FavoriteLinks {
     .DESCRIPTION
     Recursively searches the SourcePath for directories whose names end with the '⭐' emoji.
     For each matching folder found, it attempts to create a directory junction (using 'cmd /c mklink /J') in the DestinationPath.
-    
+
     The name of the junction is derived from the source folder structure, ideally formatted as 'Artist - Work Name'
     if the source folder is found at 'SourcePath\Artist\Work Name⭐'. If not nested directly under an 'Artist' folder,
     it defaults to 'Work Name'.
@@ -1837,7 +1842,7 @@ if ($availableDependencies['git']) {
         param()
         git status
     }
-    
+
     function Git-GetBranch {
         <#
         .SYNOPSIS
@@ -1852,7 +1857,7 @@ if ($availableDependencies['git']) {
         param()
         git branch
     }
-    
+
     function Git-SwitchBranch {
         <#
         .SYNOPSIS
