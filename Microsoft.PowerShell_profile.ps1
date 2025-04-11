@@ -1,6 +1,6 @@
 <# PowerShell Profile (Auto-Updating Base)
-Version: 1.04
-Last Updated: 2025-03-30
+Version: 1.1.0
+Last Updated: 2025-04-10
 Original Author: ChrisTitusTech (Concept/Base)
 Current Maintainer: RuxUnderscore <https://github.com/ruxunderscore/>
 License: MIT License
@@ -19,6 +19,7 @@ This script serves as the primary PowerShell profile (`$PROFILE`). Key features 
 - A collection of utility functions (renamed to Verb-Noun) and aliases for common tasks.
 - PSReadLine configuration for enhanced command-line editing.
 - A mechanism (`Open-UserProfileScript`/`ep`) for users to add customizations in a separate file.
+- Custom 'cd' command wrapper with Zoxide fallback.
 - Direct console feedback (Write-Host) during startup update checks.
 #>
 
@@ -27,11 +28,12 @@ This script serves as the primary PowerShell profile (`$PROFILE`). Key features 
 - 2025-03-29: Certain utility functions migrated to profile.ps1 (User's custom profile).
 - 2025-03-30: Updated header format, added detailed synopsis, attribution, and changelog (v1.03 base).
 - 2025-03-30: Moved Write-LogMessage/Test-AdminRole helpers from user profile; refactored logging/admin checks. Renamed functions to Verb-Noun; added Comment-Based Help. Added Write-Host for startup status visibility. Created aliases for original function names; consolidated all aliases to end of script (v1.04).
+- 2025-04-10: Implemented Custom-Cd function to wrap Zoxide's 'z' with fallback to Set-Location. Updated Zoxide init to use --no-aliases. Updated aliases for cd. (v1.05)
 #>
 
 #region Configuration
 ### PowerShell Profile Refactor
-### Version 1.04 - Refactored & Renamed
+### Version 1.1.0 - Refactored & Renamed
 
 $debug = $false
 
@@ -1040,10 +1042,11 @@ else {
 }
 
 
-## Final Line to set prompt
+## Zoxide Initialization (Modified) ##
 if (Get-Command zoxide -ErrorAction SilentlyContinue) {
     Write-LogMessage -Message "Zoxide found. Initializing..." -Level Information
-    Invoke-Expression (& { (zoxide init --cmd cd powershell | Out-String) })
+    # Use --no-aliases to prevent zoxide from setting its own 'cd' alias
+    Invoke-Expression (& { (zoxide init powershell --no-aliases | Out-String) }) # <-- MODIFIED LINE
 }
 else {
     # Use LogMessage for Warning level
@@ -1052,21 +1055,90 @@ else {
         winget install -e --id ajeetdsouza.zoxide
         # Use LogMessage for Information level
         Write-LogMessage -Message "zoxide installed successfully via winget. Initializing..." -Level Information
-        # Need to re-run init after install
-        Invoke-Expression (& { (zoxide init powershell | Out-String) })
+        # Need to re-run init after install, still without aliases
+        Invoke-Expression (& { (zoxide init powershell --no-aliases | Out-String) }) # <-- MODIFIED LINE
     }
     catch {
         # Use LogMessage for Error level
         Write-LogMessage -Message "Failed to install zoxide via winget. Error: $_" -Level Error
     }
 }
+
+#region Custom CD Function (Zoxide Fallback)
+function Custom-Cd {
+    <#
+    .SYNOPSIS
+    Custom 'cd' command wrapper that attempts to use zoxide's 'z' command first,
+    falling back to the built-in Set-Location on failure.
+    .DESCRIPTION
+    This function replaces the default 'cd' alias. When invoked, it tries to execute
+    the '__zoxide_z' command (provided by zoxide) with the given arguments. If '__zoxide_z' fails
+    (e.g., path not found, argument error), it catches the exception and attempts
+    to execute the standard PowerShell 'Set-Location' cmdlet with the same arguments.
+    This provides the benefits of zoxide's directory jumping while ensuring standard
+    'cd' behavior works reliably, especially with paths containing special characters
+    that zoxide might mishandle.
+    .PARAMETER Arguments
+    Catches all arguments passed to 'cd' (path, switches like '-', etc.).
+    .EXAMPLE
+    cd ~/projects/my-project # Uses zoxide '__zoxide_z' if possible, otherwise Set-Location
+    cd '.\path\with [brackets]\' # If zoxide fails, falls back to Set-Location
+    cd - # Uses zoxide '__zoxide_z -' if possible, otherwise Set-Location -
+    .NOTES
+    - Requires zoxide to be initialized *before* this function definition.
+    - The zoxide initialization should use the `--no-aliases` flag.
+    - Uses splatting (@Arguments) to pass arguments correctly.
+    #>
+    param(
+        # Capture all arguments passed to the function
+        [Parameter(ValueFromRemainingArguments=$true)]
+        [object[]]$Arguments
+    )
+
+    # Check if zoxide's '__zoxide_z' function exists
+    if (-not (Get-Command '__zoxide_z' -ErrorAction SilentlyContinue)) {
+        Write-Warning "zoxide '__zoxide_z' function not found. Using Set-Location directly."
+        try {
+            # Use splatting to pass arguments to Set-Location
+            Set-Location @Arguments -ErrorAction Stop
+        } catch {
+            # Write error using PowerShell's standard error stream
+            Write-Error $_
+        }
+        return
+    }
+
+    try {
+        # Attempt to use the zoxide function '__zoxide_z'
+        # Use the call operator '&' and splat the arguments.
+        # -ErrorAction Stop ensures script-terminating errors are caught.
+        & __zoxide_z @Arguments
+        # If 'z' function succeeds, we're done.
+    }
+    catch {
+        # zoxide ('__zoxide_z' function) failed.
+        # Log it and fall back.
+        Write-Verbose "zoxide command '__zoxide_z @Arguments' failed: $($_.Exception.Message). Falling back to Set-Location." # Use Verbose for less noise
+
+        # Fallback to standard Set-Location
+        try {
+            # Use splatting to pass the original arguments to Set-Location
+            Set-Location @Arguments -ErrorAction Stop
+        }
+        catch {
+            # Set-Location also failed. Report the error using PowerShell's standard mechanism.
+            Write-Error $_
+        }
+    }
+}
+#endregion Custom CD Function ### END NEW SECTION ###
 #endregion
 
 #region Help & Initialization
 
 # Load User Customizations (Potentially from CTTcustom.ps1 or the AllHosts profile)
 # Ensure this path is correct for your setup
-$UserCustomProfilePath = Join-Path -Path $PSScriptRoot -ChildPath "CTTcustom.ps1" # Example path
+$UserCustomProfilePath = Join-Path -Path $PSScriptRoot -ChildPath "CustomProfile.ps1" # Example path
 if (Test-Path $UserCustomProfilePath) {
     Write-LogMessage -Message "Loading user customizations from '$UserCustomProfilePath'" -Level Information
     try {
@@ -1101,6 +1173,16 @@ function Open-UserProfileScript {
 # Consolidated aliases for built-in cmdlets, external tools, and renamed functions
 
 Write-LogMessage -Message "Setting profile aliases..." -Level Information
+
+# Force removal of the existing 'cd' alias (might point to Set-Location)
+Remove-Alias -Name cd -Force -ErrorAction SilentlyContinue
+# Create the new alias 'cd' pointing to our custom wrapper function
+New-Alias -Name cd                            -Value Custom-Cd                          -Force
+New-Alias -Name cdi                           -Value __zoxide_zi                        -Force
+
+# Zoxide Aliases for defaults, in case user wants to use z and zi directly.
+New-Alias -Name z                             -Value __zoxide_z                         -Force
+New-Alias -Name zi                            -Value __zoxide_zi                        -Force
 
 # External Editor Alias (Based on $EDITOR detection)
 Set-Alias -Name vim -Value $EDITOR -Option AllScope -Force
@@ -1137,19 +1219,8 @@ Set-Alias -Name pst                           -Value Get-ClipboardText          
 Set-Alias -Name Edit-Profile                  -Value Open-UserProfileScript             -Option AllScope -Force
 
 # --- Other Common Aliases ---
-Set-Alias -Name ep -Value Open-UserProfileScript -Option AllScope -Force # Short alias for editing profile
-Set-Alias -Name su -Value Start-ElevatedProcess -Option AllScope -Force # Unix sudo/su equivalent
-Set-Alias -Name k9 -Value Stop-ProcessByName -Option AllScope -Force # Quick process kill by name
-
-# Zoxide Aliases (Conditional initialization happens earlier)
-# These might be set by zoxide init itself, but defining here ensures they exist if init runs later or fails partially.
-# Check if Zoxide's function exists before setting alias, to avoid errors if Zoxide isn't setup
-if (Get-Command '__zoxide_z' -ErrorAction SilentlyContinue) {
-    Set-Alias -Name z -Value __zoxide_z -Option AllScope -Scope Global -Force
-}
-if (Get-Command '__zoxide_zi' -ErrorAction SilentlyContinue) {
-    Set-Alias -Name zi -Value __zoxide_zi -Option AllScope -Scope Global -Force
-}
-
+Set-Alias -Name ep                            -Value Open-UserProfileScript             -Option AllScope -Force # Short alias for editing profile
+Set-Alias -Name su                            -Value Start-ElevatedProcess              -Option AllScope -Force # Unix sudo/su equivalent
+Set-Alias -Name k9                            -Value Stop-ProcessByName                 -Option AllScope -Force # Quick process kill by name
 
 #endregion Aliases
