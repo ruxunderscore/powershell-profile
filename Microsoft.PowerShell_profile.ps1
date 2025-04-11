@@ -1046,7 +1046,7 @@ else {
 if (Get-Command zoxide -ErrorAction SilentlyContinue) {
     Write-LogMessage -Message "Zoxide found. Initializing..." -Level Information
     # Use --no-aliases to prevent zoxide from setting its own 'cd' alias
-    Invoke-Expression (& { (zoxide init powershell --no-aliases | Out-String) }) # <-- MODIFIED LINE
+    Invoke-Expression (& { (zoxide init powershell --no-aliases | Out-String) })
 }
 else {
     # Use LogMessage for Warning level
@@ -1056,7 +1056,7 @@ else {
         # Use LogMessage for Information level
         Write-LogMessage -Message "zoxide installed successfully via winget. Initializing..." -Level Information
         # Need to re-run init after install, still without aliases
-        Invoke-Expression (& { (zoxide init powershell --no-aliases | Out-String) }) # <-- MODIFIED LINE
+        Invoke-Expression (& { (zoxide init powershell --no-aliases | Out-String) })
     }
     catch {
         # Use LogMessage for Error level
