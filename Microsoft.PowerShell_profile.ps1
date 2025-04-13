@@ -1141,13 +1141,13 @@ function Custom-Cd {
 
 #region Help & Initialization
 
-# Load User Customizations (Potentially from CustomProfile.ps1 or the AllHosts profile)
+# Load User Customizations (Potentially from CTTcustom.ps1 or the AllHosts profile)
 # Ensure this path is correct for your setup
 $UserCustomProfilePath = Join-Path -Path $PSScriptRoot -ChildPath "CustomProfile.ps1" # Example path
 if (Test-Path $UserCustomProfilePath) {
     Write-LogMessage -Message "Loading user customizations from '$UserCustomProfilePath'" -Level Information
     try {
-        Invoke-Expression -Command ". `"$UserCustomProfilePath`""
+        Invoke-Expression -Command "& `"$UserCustomProfilePath`"" # Consider dot-sourcing: . $UserCustomProfilePath
     }
     catch {
         Write-LogMessage -Message "Error loading user customizations from '$UserCustomProfilePath': $_" -Level Error
