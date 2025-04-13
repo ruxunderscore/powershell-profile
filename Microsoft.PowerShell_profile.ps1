@@ -46,18 +46,20 @@ $timeFilePath = $(Join-Path -Path $currentDocumentFolder -ChildPath "\PowerShell
 $updateInterval = 7
 
 if ($debug) {
-    Write-Host "#######################################" -ForegroundColor Red
-    Write-Host "#           Debug mode enabled        #" -ForegroundColor Red
-    Write-Host "#          ONLY FOR DEVELOPMENT       #" -ForegroundColor Red
-    Write-Host "#                                     #" -ForegroundColor Red
-    Write-Host "#       IF YOU ARE NOT DEVELOPING     #" -ForegroundColor Red
-    Write-Host "#       JUST RUN \`Update-Profile\`     #" -ForegroundColor Red
-    Write-Host "#        to discard all changes       #" -ForegroundColor Red
-    Write-Host "#   and update to the latest profile  #" -ForegroundColor Red
-    Write-Host "#               version               #" -ForegroundColor Red
-    Write-Host "#######################################" -ForegroundColor Red
+    $debugText = @"
+#######################################
+#          Debug mode enabled         #
+#         ONLY FOR DEVELOPMENT        #
+#                                     #
+#      IF YOU ARE NOT DEVELOPING      #
+#      JUST RUN ``Update-Profile``      #
+#       to discard all changes        #
+#  and update to the latest profile   #
+#               version               #
+#######################################
+"@
+    Write-Host $debugText -ForegroundColor Red
 }
-
 
 #################################################################################################################################
 ############                                                                                                         ############
