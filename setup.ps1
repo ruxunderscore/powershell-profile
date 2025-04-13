@@ -83,7 +83,8 @@ if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
         # Ensure TLS 1.2+ is used, execute install script
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))        Write-Host "Chocolatey installation attempted. Please verify success." -ForegroundColor Yellow
+        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        Write-Host "Chocolatey installation attempted. Please verify success." -ForegroundColor Yellow
         # Add Chocolatey to PATH for the current session if install was successful
         $env:Path += ";$env:ProgramData\chocolatey\bin"
     }
