@@ -1,5 +1,5 @@
 <# PowerShell Profile (Auto-Updating Base)
-Version: 1.1.0
+Version: 1.1.1
 Last Updated: 2025-04-10
 Original Author: ChrisTitusTech (Concept/Base)
 Current Maintainer: RuxUnderscore <https://github.com/ruxunderscore/>
@@ -29,11 +29,12 @@ This script serves as the primary PowerShell profile (`$PROFILE`). Key features 
 - 2025-03-30: Updated header format, added detailed synopsis, attribution, and changelog (v1.03 base).
 - 2025-03-30: Moved Write-LogMessage/Test-AdminRole helpers from user profile; refactored logging/admin checks. Renamed functions to Verb-Noun; added Comment-Based Help. Added Write-Host for startup status visibility. Created aliases for original function names; consolidated all aliases to end of script (v1.04).
 - 2025-04-10: Implemented Custom-Cd function to wrap Zoxide's 'z' with fallback to Set-Location. Updated Zoxide init to use --no-aliases. Updated aliases for cd. (v1.05)
+- 2025-04-13: Refactored Editor Selection Logic. (v1.1.1)
 #>
 
 #region Configuration
 ### PowerShell Profile Refactor
-### Version 1.1.0 - Refactored & Renamed
+### Version 1.1.1 - Refactored & Renamed
 
 $debug = $false
 
@@ -275,6 +276,18 @@ else {
 #endregion
 
 #region Utilities
+#region Editor Configuration
+$editors = @('nvim', 'pvim', 'vim', 'vi', 'code', 'notepad++', 'sublime_text', 'notepad')
+
+foreach ($editor in $editors) {
+    if (Test-CommandExists -Command $editor) {
+        $global:editor = $editor
+        break
+    }
+}
+#endregion Editory Configuration
+
+#region Utility Functions
 function Clear-SystemCache {
     <#
     .SYNOPSIS
@@ -323,7 +336,6 @@ function prompt {
 $adminSuffix = if ($isAdmin) { " [ADMIN]" } else { "" }
 $Host.UI.RawUI.WindowTitle = "PowerShell {0}$adminSuffix" -f $PSVersionTable.PSVersion.ToString()
 
-# Utility Functions
 function Test-CommandExists {
     <#
     .SYNOPSIS
@@ -340,16 +352,6 @@ function Test-CommandExists {
     $exists = $null -ne (Get-Command $command -ErrorAction SilentlyContinue)
     return $exists
 }
-
-# Editor Configuration
-$EDITOR = if (Test-CommandExists nvim) { 'nvim' }
-elseif (Test-CommandExists pvim) { 'pvim' }
-elseif (Test-CommandExists vim) { 'vim' }
-elseif (Test-CommandExists vi) { 'vi' }
-elseif (Test-CommandExists code) { 'code' }
-elseif (Test-CommandExists notepad++) { 'notepad++' }
-elseif (Test-CommandExists sublime_text) { 'sublime_text' }
-else { 'notepad' }
 
 function New-EmptyFile {
     <#
@@ -810,7 +812,8 @@ function Move-ItemToRecycleBin {
         Write-LogMessage -Message "Error moving item '$Path' to Recycle Bin: $_" -Level Error
     }
 }
-#endregion
+#endregion Utility Functions
+#endregion Utilities
 
 #region Aliases & Shortcuts
 ### Quality of Life Aliases
@@ -1156,17 +1159,17 @@ else {
 function Open-UserProfileScript {
     <#
    .SYNOPSIS
-   Opens the current user's 'AllHosts' profile script for editing using the configured editor ($EDITOR).
+   Opens the current user's 'AllHosts' profile script for editing using the configured editor ($global:editor).
    .DESCRIPTION
    Identifies the profile script path for 'CurrentUserAllHosts' ($PROFILE.CurrentUserAllHosts)
-   and opens it using the editor determined earlier in the profile script ($EDITOR, e.g., vim, code, notepad).
+   and opens it using the editor determined earlier in the profile script ($global:editor, e.g., vim, code, notepad).
    This is the recommended place for user-specific, persistent customizations.
    .EXAMPLE
    Open-UserProfileScript
    .NOTES
    Alias: ep, Edit-Profile
    #>
-    & $EDITOR $PROFILE.CurrentUserAllHosts
+    & $global:editor $PROFILE.CurrentUserAllHosts
 }
 #endregion
 #region Aliases
@@ -1184,8 +1187,8 @@ New-Alias -Name cdi                           -Value __zoxide_zi                
 New-Alias -Name z                             -Value __zoxide_z                         -Force
 New-Alias -Name zi                            -Value __zoxide_zi                        -Force
 
-# External Editor Alias (Based on $EDITOR detection)
-Set-Alias -Name vim -Value $EDITOR -Option AllScope -Force
+# External Editor Alias (Based on $global:editor detection)
+Set-Alias -Name vim -Value $global:editor -Option AllScope -Force
 
 # --- Aliases for Renamed Functions (Original Name -> New Name) ---
 Set-Alias -Name Update-Profile                -Value Update-BaseProfile                 -Option AllScope -Force
