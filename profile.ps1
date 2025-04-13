@@ -1,5 +1,5 @@
 <# PowerShell Profile
-Version: 1.7.1
+Version: 1.7.2
 Last Updated: 2025-03-30
 Author: RuxUnderscore <https://github.com/ruxunderscore/>
 License: MIT License
@@ -38,6 +38,7 @@ It includes features like:
 - 2025-03-30: Updated header format, added License and Synopsis.
 - 2025-03-30: Moved core helper functions (Write-LogMessage, Test-AdminRole) to Microsoft.Powershell_profile.ps1 (Base Profile). Moved Aliases region to end of script for better organization.
 - 2025-04-07: Changed SeriesName handling in New-SeriesEpisodes and other fixes
+- 2025-04-13: Make SeriesName lowercase in New-SeriesEpisodes.
 #>
 
 #region Configuration
@@ -893,7 +894,7 @@ function Rename-SeriesEpisodes {
 
     # Format SeriesName if provided (replace spaces with underscores)
     if ($SeriesName) {
-        $SeriesName = $SeriesName -replace '\s+', '_'
+        $SeriesName = $SeriesName.ToLower() -replace '\s+', '_'
         Write-Verbose "Using provided SeriesName: $SeriesName"
     }
 
