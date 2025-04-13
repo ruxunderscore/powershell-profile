@@ -2,6 +2,11 @@
 
 A functional and enhanced PowerShell environment, initially based on [ChrisTitusTech's Powershell Profile](https://github.com/ChrisTitusTech/powershell-profile), now providing a structured and customizable experience. This repository contains two key profile components: a self-updating base profile and an advanced user profile with extra features.
 
+## Requirements
+
+- Powershell 7
+- Administrator
+
 ## ✨ Features
 
 - **Base Profile (`Microsoft.Powershell_profile.ps1`):**
