@@ -1,16 +1,17 @@
 <# PowerShell Environment Setup Script
-Version: 1.2
-Last Updated: 2025-03-30
+Version: 1.2 (Refactored)
+Last Updated: 2025-04-13
 Original Author: ChrisTitusTech (Concept/Base)
 Current Maintainer: RuxUnderscore <https://github.com/ruxunderscore/>
 License: MIT License
 
 .SYNOPSIS
-Installs necessary tools, fonts, helper functions, and the PowerShell profile script(s).
+Installs necessary tools, fonts, helper functions, and the PowerShell profile script(s)
+using a structured, function-based approach.
 
 .DESCRIPTION
 This script prepares a Windows environment for a customized PowerShell experience.
-It performs the following steps:
+It performs the following steps by calling dedicated functions:
 - Checks for Administrator privileges and internet connectivity.
 - Installs dependencies: Chocolatey, Winget packages (Starship, Zoxide, Eza),
   PowerShell Modules (Terminal-Icons), and Nerd Fonts.
@@ -20,9 +21,8 @@ It performs the following steps:
 - Optionally downloads and configures the user's advanced profile script (`profile.ps1`)
   to the CurrentUserAllHosts location.
 - Provides user guidance and status messages.
-#>
 
-<# Changelog:
+Changelog:
 - 2025-03-30 (v1.0): Initialized script based on CTT concept. Added Admin/Internet checks,
                       Nerd Font install function, tool installations (Starship, Choco,
                       Icons, Zoxide, Eza), profile download/backup logic, header/comments.
@@ -30,25 +30,21 @@ It performs the following steps:
                       Added more comments. Implemented optional download for advanced user
                       profile (`profile.ps1`) to CurrentUserAllHosts location with backup.
 - 2025-03-30 (v1.2): Added step to download shared `HelperFunctions.ps1`. Updated header/comments.
+- 2025-04-13 (v1.2 Refactored): Moved core logic into functions for better structure.
 #>
 
-#region Initial Checks
+#region Functions
 
-# --- Script Header ---
-Write-Host "Starting PowerShell Environment Setup..." -ForegroundColor Cyan
-
-# --- Administrator Check ---
-Write-Host "Checking for Administrator privileges..."
-if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Error "Administrator privileges are required. Please re-run this script as an Administrator!"
-    # Pause execution to allow user to read the error before the window closes if run directly
-    Read-Host "Press Enter to exit..."
-    exit 1 # Use a non-zero exit code for error
+function Test-IsAdmin {
+    Write-Host "Checking for Administrator privileges..."
+    if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+        Write-Error "Administrator privileges are required. Please re-run this script as an Administrator!"
+        Read-Host "Press Enter to exit..."
+        exit 1 # Use a non-zero exit code for error
+    }
+    Write-Host "Administrator privileges confirmed." -ForegroundColor Green
 }
-Write-Host "Administrator privileges confirmed." -ForegroundColor Green
 
-# --- Internet Connectivity Check ---
-# Function to test internet connectivity
 function Test-InternetConnection {
     Write-Host "Testing internet connection..."
     try {
@@ -59,102 +55,72 @@ function Test-InternetConnection {
     }
     catch {
         Write-Error "Internet connection failed or is unavailable. This script requires internet access."
-        return $false
+        Read-Host "Press Enter to exit..."
+        exit 1
     }
 }
 
-# Check for internet connectivity before proceeding
-if (-not (Test-InternetConnection)) {
-    Read-Host "Press Enter to exit..."
-    exit 1
+function Install-Chocolatey {
+    Write-Host "Checking/Installing Chocolatey Package Manager..."
+    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+        Write-Host "Chocolatey not found. Attempting installation..."
+        try {
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+            Write-Host "Chocolatey installation attempted. Please verify success." -ForegroundColor Yellow
+            $env:Path += ";$env:ProgramData\chocolatey\bin" # Add to PATH for current session
+        }
+        catch {
+            Write-Warning "Failed to install Chocolatey. Some dependencies might fail. Error: $_"
+        }
+    } else {
+        Write-Host "Chocolatey already installed." -ForegroundColor Green
+    }
 }
 
-#endregion Initial Checks
+function Install-WingetPackage {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$PackageName,
 
-#region Dependency Installation
-
-Write-Host "`n--- Installing Dependencies ---" -ForegroundColor Cyan
-
-# --- Chocolatey Installation ---
-Write-Host "Checking/Installing Chocolatey Package Manager..."
-if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-    Write-Host "Chocolatey not found. Attempting installation..."
-    try {
-        # Ensure TLS 1.2+ is used, execute install script
-        Set-ExecutionPolicy Bypass -Scope Process -Force
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-        Write-Host "Chocolatey installation attempted. Please verify success." -ForegroundColor Yellow
-        # Add Chocolatey to PATH for the current session if install was successful
-        $env:Path += ";$env:ProgramData\chocolatey\bin"
+        [Parameter(Mandatory=$true)]
+        [string]$PackageId
+    )
+    Write-Host "Checking/Installing $PackageName (via winget)..."
+    if (-not (Get-Command $PackageName -ErrorAction SilentlyContinue)) {
+        try {
+            winget install --id $PackageId --exact --accept-package-agreements --accept-source-agreements --silent --ErrorAction Stop
+            Write-Host "$PackageName installed successfully." -ForegroundColor Green
+        }
+        catch {
+            Write-Warning "Failed to install $PackageName via winget. Error: $_"
+        }
+    } else {
+        Write-Host "$PackageName already installed." -ForegroundColor Green
     }
-    catch {
-        Write-Warning "Failed to install Chocolatey. Some dependencies might fail. Error: $_"
-    }
-} else {
-    Write-Host "Chocolatey already installed." -ForegroundColor Green
 }
 
-# --- Winget Packages Installation ---
-# Install Starship Prompt
-Write-Host "Checking/Installing Starship (via winget)..."
-if (-not (Get-Command starship -ErrorAction SilentlyContinue)) {
-    try {
-        winget install --id Starship.Starship --exact --accept-package-agreements --accept-source-agreements --silent
-        Write-Host "Starship installed successfully." -ForegroundColor Green
+function Install-PSModule {
+     param(
+        [Parameter(Mandatory=$true)]
+        [string]$ModuleName
+    )
+     Write-Host "Checking/Installing $ModuleName PowerShell module..."
+    if (-not (Get-Module -ListAvailable -Name $ModuleName)) {
+        try {
+            Install-Module -Name $ModuleName -Repository PSGallery -Force -SkipPublisherCheck -Scope CurrentUser -ErrorAction Stop
+            Write-Host "$ModuleName module installed successfully." -ForegroundColor Green
+        }
+        catch {
+            Write-Warning "Failed to install $ModuleName module. Error: $_"
+        }
+    } else {
+        Write-Host "$ModuleName module already installed." -ForegroundColor Green
     }
-    catch {
-        Write-Warning "Failed to install Starship via winget. Error: $_"
-    }
-} else {
-    Write-Host "Starship already installed." -ForegroundColor Green
 }
 
-# Install Zoxide
-Write-Host "Checking/Installing Zoxide (via winget)..."
-if (-not (Get-Command zoxide -ErrorAction SilentlyContinue)) {
-    try {
-        winget install -e --id ajeetdsouza.zoxide --accept-package-agreements --accept-source-agreements --silent
-        Write-Host "Zoxide installed successfully." -ForegroundColor Green
-    }
-    catch {
-        Write-Warning "Failed to install Zoxide via winget. Error: $_"
-    }
-} else {
-    Write-Host "Zoxide already installed." -ForegroundColor Green
-}
-
-# Install Eza
-Write-Host "Checking/Installing Eza (via winget)..."
-if (-not (Get-Command eza -ErrorAction SilentlyContinue)) {
-    try {
-        winget install --id eza-community.eza --exact --accept-package-agreements --accept-source-agreements --silent
-        Write-Host "Eza installed successfully." -ForegroundColor Green
-    } catch {
-        Write-Warning "Failed to install Eza via winget. Error: $_"
-    }
-} else {
-    Write-Host "Eza already installed." -ForegroundColor Green
-}
-
-# --- PowerShell Modules Installation ---
-Write-Host "Checking/Installing Terminal-Icons PowerShell module..."
-if (-not (Get-Module -ListAvailable -Name Terminal-Icons)) {
-    try {
-        Install-Module -Name Terminal-Icons -Repository PSGallery -Force -SkipPublisherCheck -Scope CurrentUser -ErrorAction Stop
-        Write-Host "Terminal-Icons module installed successfully." -ForegroundColor Green
-    }
-    catch {
-        Write-Warning "Failed to install Terminal-Icons module. Error: $_"
-    }
-} else {
-    Write-Host "Terminal-Icons module already installed." -ForegroundColor Green
-}
-
-
-# --- Nerd Fonts Installation ---
-# Function to install Nerd Fonts (scoped locally to this script)
-function Install-NerdFonts {
+function Install-NerdFont {
     param (
         [string]$FontName = "CascadiaCode", # The name used in the Nerd Fonts release URL
         [string]$FontDisplayName = "CaskaydiaCove NF", # The name as it appears in Font Settings
@@ -163,7 +129,6 @@ function Install-NerdFonts {
 
     Write-Host "Checking/Installing Nerd Font: $FontDisplayName..."
     try {
-        # Load System.Drawing assembly to check installed fonts
         Add-Type -AssemblyName System.Drawing
         $fontFamilies = (New-Object System.Drawing.Text.InstalledFontCollection).Families.Name
         if ($fontFamilies -notcontains $FontDisplayName) {
@@ -172,32 +137,25 @@ function Install-NerdFonts {
             $zipFilePath = Join-Path -Path $env:TEMP -ChildPath "${FontName}.zip"
             $extractPath = Join-Path -Path $env:TEMP -ChildPath "${FontName}"
 
-            # Download the font archive
             Invoke-WebRequest -Uri $fontZipUrl -OutFile $zipFilePath -UseBasicParsing -ErrorAction Stop
             Write-Host "Download complete. Extracting..."
 
-            # Extract the archive
             Expand-Archive -Path $zipFilePath -DestinationPath $extractPath -Force -ErrorAction Stop
             Write-Host "Extraction complete. Installing fonts..."
 
-            # Get the Windows Fonts directory COM object
-            $fontsShellFolder = (New-Object -ComObject Shell.Application).Namespace(0x14) # 0x14 corresponds to the Fonts folder
+            $fontsShellFolder = (New-Object -ComObject Shell.Application).Namespace(0x14) # 0x14 = Fonts folder
 
-            # Find and copy font files (usually .ttf, sometimes .otf)
             Get-ChildItem -Path $extractPath -Recurse -Include "*.ttf", "*.otf" | ForEach-Object {
                 $fontFileName = $_.Name
-                # Check if font already exists to avoid error/prompt from CopyHere
                 if (-not (Test-Path (Join-Path $env:SystemRoot Fonts $fontFileName))) {
                     Write-Verbose "Installing $($_.Name)"
-                    # CopyHere method with 0x10 flag suppresses progress dialogs
-                    $fontsShellFolder.CopyHere($_.FullName, 0x10)
+                    $fontsShellFolder.CopyHere($_.FullName, 0x10) # 0x10 = Supress progress dialogs
                 } else {
-                    Write-Verbose "Font '$($_.Name)' already exists in Fonts folder. Skipping."
+                    Write-Verbose "Font '$($_.Name)' already exists. Skipping."
                 }
             }
             Write-Host "$FontDisplayName fonts installed successfully." -ForegroundColor Green
 
-            # Cleanup temporary files
             Write-Host "Cleaning up temporary files..."
             Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item -Path $zipFilePath -Force -ErrorAction SilentlyContinue
@@ -206,30 +164,105 @@ function Install-NerdFonts {
         }
     }
     catch {
-        Write-Warning "Failed to download or install '$FontDisplayName' font. Manual installation may be required. Error: $_"
+        Write-Warning "Failed to download or install '$FontDisplayName' font. Manual installation required. Error: $_"
     }
 }
 
-# Install the desired Nerd Font
-Install-NerdFonts -FontName "CascadiaCode" -FontDisplayName "CaskaydiaCove NF" -Version "3.2.1" # Specify desired version
+function Download-ScriptFile {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Url,
 
+        [Parameter(Mandatory=$true)]
+        [string]$DestinationPath,
+
+        [Parameter(Mandatory=$true)]
+        [string]$Description,
+
+        [switch]$BackupExisting
+    )
+
+    Write-Host "`nSetting up $Description ($DestinationPath)..."
+
+    # Backup Existing if requested and file exists
+    if ($BackupExisting -and (Test-Path -Path $DestinationPath -PathType Leaf)) {
+        $backupPath = "$DestinationPath.old"
+        Write-Host "Existing $Description found. Backing up to: $backupPath" -ForegroundColor Yellow
+        try {
+            Copy-Item -Path $DestinationPath -Destination $backupPath -Force -ErrorAction Stop
+        } catch {
+            Write-Warning "Failed to backup existing $Description. Will attempt to overwrite. Error: $_"
+        }
+    }
+
+    # Download the file
+    Write-Host "Downloading $Description from $Url..."
+    try {
+        Invoke-RestMethod -Uri $Url -OutFile $DestinationPath -ErrorAction Stop
+        Write-Host "$Description downloaded/updated successfully." -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Error "Failed to download or save the $Description. Error: $_"
+        return $false
+    }
+}
+
+function Show-SetupSummary {
+    param(
+        [string]$HelperScriptPath,
+        [string]$BasePath,
+        [string]$AdvancedPath,
+        [bool]$AdvancedInstalledAttempted
+    )
+     Write-Host "`n--- Setup Summary ---" -ForegroundColor Cyan
+    if (Test-Path -Path $HelperScriptPath) { Write-Host "- Helper script setup appears successful." -ForegroundColor Green } else { Write-Warning "- Helper script file ($HelperScriptPath) not found."}
+    if (Test-Path -Path $BasePath) { Write-Host "- Base profile setup appears successful." -ForegroundColor Green } else { Write-Warning "- Base profile file ($BasePath) not found."}
+    if ($AdvancedInstalledAttempted) {
+        if (Test-Path -Path $AdvancedPath) { Write-Host "- Advanced profile setup appears successful." -ForegroundColor Green } else { Write-Warning "- Advanced profile file ($AdvancedPath) not found despite attempting download."}
+    }
+
+    # Check for key tools
+    if (Get-Command starship -ErrorAction SilentlyContinue){ Write-Host "- Starship appears installed." -ForegroundColor Green} else { Write-Warning "- Starship installation may have failed."}
+    if (Get-Command zoxide -ErrorAction SilentlyContinue){ Write-Host "- Zoxide appears installed." -ForegroundColor Green} else { Write-Warning "- Zoxide installation may have failed."}
+    if (Get-Command eza -ErrorAction SilentlyContinue){ Write-Host "- eza appears installed." -ForegroundColor Green} else { Write-Warning "- eza installation may have failed."}
+
+    Write-Host "`nSetup script finished." -ForegroundColor Cyan
+    Write-Host ">>> Please RESTART your PowerShell session for all changes to take effect! <<<" -ForegroundColor White -BackgroundColor DarkMagenta
+}
+
+#endregion Functions
+
+# --- Main Script Execution ---
+
+Write-Host "Starting PowerShell Environment Setup..." -ForegroundColor Cyan
+
+#region Initial Checks
+Test-IsAdmin
+Test-InternetConnection
+#endregion Initial Checks
+
+#region Dependency Installation
+Write-Host "`n--- Installing Dependencies ---" -ForegroundColor Cyan
+Install-Chocolatey
+Install-WingetPackage -PackageName "Starship" -PackageId "Starship.Starship"
+Install-WingetPackage -PackageName "Zoxide" -PackageId "ajeetdsouza.zoxide"
+Install-WingetPackage -PackageName "Eza" -PackageId "eza-community.eza"
+Install-PSModule -ModuleName "Terminal-Icons"
+Install-NerdFont -FontName "CascadiaCode" -FontDisplayName "CaskaydiaCove NF" -Version "3.2.1"
 #endregion Dependency Installation
 
 #region Profile and Helper Script Setup
-
 Write-Host "`n--- Setting up Profile Scripts ---" -ForegroundColor Cyan
 
 # --- Define URLs ---
-# *** IMPORTANT: Verify these URLs point to the RAW content of your files on GitHub/etc. ***
 $BaseProfileUrl = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/Microsoft.PowerShell_profile.ps1"
 $AdvancedProfileUrl = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/main/profile.ps1"
 $HelperScriptUrl = "https://raw.githubusercontent.com/ruxunderscore/powershell-profile/refs/heads/main/HelperFunctions.ps1"
 
 # --- Determine Profile Paths and Directory ---
-# $PROFILE variable automatically holds the correct path for the CurrentUserCurrentHost profile
-$profilePath = $PROFILE
-$profileDir = Split-Path -Path $profilePath -Parent # Should be C:\Users\user\Documents\PowerShell
-$UserAllHostsProfilePath = $PROFILE.CurrentUserAllHosts # Often same dir, different filename
+$profilePath = $PROFILE # CurrentUserCurrentHost
+$profileDir = Split-Path -Path $profilePath -Parent
+$UserAllHostsProfilePath = $PROFILE.CurrentUserAllHosts
 $helperScriptPath = Join-Path -Path $profileDir -ChildPath "HelperFunctions.ps1"
 
 # --- Check/Create Profile Directory ---
@@ -247,38 +280,21 @@ if (!(Test-Path -Path $profileDir -PathType Container)) {
     Write-Host "Profile directory already exists."
 }
 
-# --- Download HelperFunctions.ps1 --- ### NEW SECTION ###
-Write-Host "Downloading shared helper script..."
-try {
-    Invoke-RestMethod -Uri $HelperScriptUrl -OutFile $helperScriptPath -ErrorAction Stop
-    Write-Host "Helper script ($helperScriptPath) downloaded successfully." -ForegroundColor Green
-} catch {
-    # This is critical, as profiles depend on it. Treat as error.
-    Write-Error "Failed to download or save the helper script. Profiles may not load correctly. Please check the URL '$HelperScriptUrl' and permissions. Error: $_"
-    # Optionally exit here if helpers are essential for base profile function
-    # Read-Host "Press Enter to exit..."; exit 1
+# --- Download HelperFunctions.ps1 ---
+$helperDownloaded = Download-ScriptFile -Url $HelperScriptUrl -DestinationPath $helperScriptPath -Description "Helper Script" -BackupExisting:$false
+if (-not $helperDownloaded) {
+     Write-Error "Critical helper script failed to download. Profiles may not load correctly."
+     # Decide if you want to exit here
+     # Read-Host "Press Enter to exit..."; exit 1
 }
 
 # --- Base Profile Setup ($PROFILE) ---
-Write-Host "`nSetting up Base PowerShell Profile ($profilePath)..."
-# Backup Existing
-if (Test-Path -Path $profilePath -PathType Leaf) {
-    $backupProfilePath = "$profilePath.old"
-    Write-Host "Existing base profile found. Backing up to: $backupProfilePath" -ForegroundColor Yellow
-    try { Copy-Item -Path $profilePath -Destination $backupProfilePath -Force -ErrorAction Stop } catch { Write-Warning "Failed to backup existing base profile. Will attempt to overwrite. Error: $_" }
-}
-# Download Base Profile
-Write-Host "Downloading base profile from $BaseProfileUrl..."
-try {
-    Invoke-RestMethod -Uri $BaseProfileUrl -OutFile $profilePath -ErrorAction Stop
-    Write-Host "Base profile downloaded/updated successfully." -ForegroundColor Green
-} catch {
-    Write-Error "Failed to download or save the base profile. Error: $_"
-}
+Download-ScriptFile -Url $BaseProfileUrl -DestinationPath $profilePath -Description "Base Profile" -BackupExisting:$true
 Write-Host "NOTE: Base profile uses auto-update. Use 'ep' alias to edit user-specific profile." -ForegroundColor Yellow
 
 
 # --- Optional Advanced Profile Setup ($PROFILE.CurrentUserAllHosts) ---
+$downloadAdvanced = $false # Flag to track user choice
 Write-Host "`nChecking for Advanced Profile installation..."
 $promptMessage = @"
 
@@ -292,21 +308,8 @@ Download advanced profile? (Y/N):
 $choice = Read-Host -Prompt $promptMessage
 
 if ($choice -match '^[Y]') {
-    Write-Host "Proceeding with advanced profile download..."
-    # Backup Existing
-    if (Test-Path -Path $UserAllHostsProfilePath -PathType Leaf) {
-        $backupUserAllHostsPath = "$UserAllHostsProfilePath.old"
-        Write-Host "Existing advanced profile found. Backing up to: $backupUserAllHostsPath" -ForegroundColor Yellow
-        try { Copy-Item -LiteralPath $UserAllHostsProfilePath -Destination $backupUserAllHostsPath -Force -ErrorAction Stop } catch { Write-Warning "Failed to backup existing advanced profile. Will attempt to overwrite. Error: $_" }
-    }
-    # Download Advanced Profile
-    Write-Host "Downloading advanced profile from $AdvancedProfileUrl..."
-    try {
-        Invoke-RestMethod -Uri $AdvancedProfileUrl -OutFile $UserAllHostsProfilePath -ErrorAction Stop
-        Write-Host "Advanced profile ($UserAllHostsProfilePath) downloaded successfully." -ForegroundColor Green
-    } catch {
-        Write-Error "Failed to download or save the advanced profile. Error: $_"
-    }
+    $downloadAdvanced = $true
+    Download-ScriptFile -Url $AdvancedProfileUrl -DestinationPath $UserAllHostsProfilePath -Description "Advanced Profile" -BackupExisting:$true
 } else {
     Write-Host "Skipping advanced profile download." -ForegroundColor Yellow
     Write-Host "Your customizations should go in: $UserAllHostsProfilePath (use 'ep' alias later)."
@@ -315,20 +318,5 @@ if ($choice -match '^[Y]') {
 #endregion Profile and Helper Script Setup
 
 #region Completion Message
-
-Write-Host "`n--- Setup Summary ---" -ForegroundColor Cyan
-if (Test-Path -Path $helperScriptPath) { Write-Host "- Helper script setup appears successful." -ForegroundColor Green } else { Write-Warning "- Helper script file ($helperScriptPath) not found."}
-if (Test-Path -Path $profilePath) { Write-Host "- Base profile setup appears successful." -ForegroundColor Green } else { Write-Warning "- Base profile file ($profilePath) not found."}
-if ($choice -match '^[Y]') {
-    if (Test-Path -Path $UserAllHostsProfilePath) { Write-Host "- Advanced profile setup appears successful." -ForegroundColor Green } else { Write-Warning "- Advanced profile file ($UserAllHostsProfilePath) not found despite attempting download."}
-}
-
-# Check for key tools (optional, but good feedback)
-if (Get-Command starship -ErrorAction SilentlyContinue){ Write-Host "- Starship appears installed." -ForegroundColor Green} else { Write-Warning "- Starship installation may have failed."}
-if (Get-Command zoxide -ErrorAction SilentlyContinue){ Write-Host "- Zoxide appears installed." -ForegroundColor Green} else { Write-Warning "- Zoxide installation may have failed."}
-if (Get-Command eza -ErrorAction SilentlyContinue){ Write-Host "- eza appears installed." -ForegroundColor Green} else { Write-Warning "- eza installation may have failed."}
-
-Write-Host "`nSetup script finished." -ForegroundColor Cyan
-Write-Host ">>> Please RESTART your PowerShell session for all changes to take effect! <<<" -ForegroundColor White -BackgroundColor DarkMagenta
-
+Show-SetupSummary -HelperScriptPath $helperScriptPath -BasePath $profilePath -AdvancedPath $UserAllHostsProfilePath -AdvancedInstalledAttempted $downloadAdvanced
 #endregion Completion Message
