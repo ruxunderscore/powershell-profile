@@ -90,7 +90,7 @@ function Install-WingetPackage {
     Write-Host "Checking/Installing $PackageName (via winget)..."
     if (-not (Get-Command $PackageName -ErrorAction SilentlyContinue)) {
         try {
-            winget install --id $PackageId --exact --accept-package-agreements --accept-source-agreements --silent --ErrorAction Stop
+            winget install --id $PackageId -e --accept-package-agreements --accept-source-agreements -h -ErrorAction Stop
             Write-Host "$PackageName installed successfully." -ForegroundColor Green
         }
         catch {
