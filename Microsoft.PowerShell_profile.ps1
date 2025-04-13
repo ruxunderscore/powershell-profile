@@ -278,16 +278,6 @@ else {
 #endregion
 
 #region Utilities
-#region Editor Configuration
-$editors = @('nvim', 'pvim', 'vim', 'vi', 'code', 'notepad++', 'sublime_text', 'notepad')
-
-foreach ($editor in $editors) {
-    if (Test-CommandExists -Command $editor) {
-        $global:editor = $editor
-        break
-    }
-}
-#endregion Editory Configuration
 
 #region Utility Functions
 function Clear-SystemCache {
@@ -354,6 +344,17 @@ function Test-CommandExists {
     $exists = $null -ne (Get-Command $command -ErrorAction SilentlyContinue)
     return $exists
 }
+
+#region Editor Configuration
+$editors = @('nvim', 'pvim', 'vim', 'vi', 'code', 'notepad++', 'sublime_text', 'notepad')
+
+foreach ($editor in $editors) {
+    if (Test-CommandExists -Command $editor) {
+        $global:editor = $editor
+        break
+    }
+}
+#endregion Editory Configuration
 
 function New-EmptyFile {
     <#
